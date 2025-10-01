@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SoundCanvas Visualization Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #0a0a0a;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .success { background: #004d00; }
+        .error { background: #4d0000; }
+        .info { background: #004d4d; }
+        #testCanvas {
+            border: 1px solid #333;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>SoundCanvas Visualization Test</h1>
+    <div id="status"></div>
+
+    <h2>Direct Canvas Test</h2>
+    <canvas id="testCanvas" width="800" height="600"></canvas>
+
+    <script>
+        const statusDiv = document.getElementById('status');
+
+        function addStatus(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.textContent = new Date().toISOString() + ': ' + message;
+            statusDiv.appendChild(div);
+            console.log(message);
+        }
+
+        // Test 1: Canvas availability
+        addStatus('🧪 Starting visualization tests...');
+
+        const canvas = document.getElementById('testCanvas');
+        if (!canvas) {
+            addStatus('❌ Canvas element not found!', 'error');
+        } else {
+            addStatus('✅ Canvas element found', 'success');
+
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                addStatus('❌ 2D context not available!', 'error');
+            } else {
+                addStatus('✅ 2D context available', 'success');
+
+                // Test 2: Basic drawing
+                try {
+                    ctx.fillStyle = '#ff0000';
+                    ctx.fillRect(10, 10, 50, 50);
+                    ctx.fillStyle = '#00ff00';
+                    ctx.fillRect(70, 10, 50, 50);
+                    ctx.fillStyle = '#0000ff';
+                    ctx.fillRect(130, 10, 50, 50);
+                    addStatus('✅ Basic drawing test passed', 'success');
+                } catch (error) {
+                    addStatus('❌ Basic drawing test failed: ' + error.message, 'error');
+                }
+
+                // Test 3: Audio context
+                try {
+                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    addStatus('✅ AudioContext created: ' + audioContext.state, 'success');
+
+                    // Test 4: Demo visualization
+                    let frameCount = 0;
+                    const animate = () => {
+                        frameCount++;
+
+                        // Clear canvas
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                        // Set background gradient
+                        const gradient = ctx.createRadialGradient(
+                            canvas.width / 2, canvas.height / 2, 0,
+                            canvas.width / 2, canvas.height / 2, 400
+                        );
+                        gradient.addColorStop(0, 'rgba(5, 5, 15, 0.7)');
+                        gradient.addColorStop(1, 'rgba(0, 0, 5, 0.9)');
+                        ctx.fillStyle = gradient;
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                        // Generate demo mandala pattern
+                        const centerX = canvas.width / 2;
+                        const centerY = canvas.height / 2;
+                        const timestamp = Date.now();
+
+                        ctx.save();
+                        ctx.translate(centerX, centerY);
+
+                        for (let ring = 0; ring < 3; ring++) {
+                            const ringRadius = 150 * (0.3 + ring * 0.3);
+
+                            for (let i = 0; i < 16; i++) {
+                                const angle = (i / 16) * Math.PI * 2 + timestamp * 0.001 * (ring + 1);
+                                const amplitude = 0.5 + Math.sin(timestamp * 0.01 + i) * 0.3;
+
+                                const x = Math.cos(angle) * ringRadius * amplitude;
+                                const y = Math.sin(angle) * ringRadius * amplitude;
+
+                                // Draw circles with glow
+                                ctx.beginPath();
+                                ctx.arc(x, y, 3 + amplitude * 8, 0, Math.PI * 2);
+                                ctx.fillStyle = `hsl(${(i / 16) * 360 + timestamp * 0.05 + ring * 120}, 90%, ${70 + amplitude * 25}%)`;
+                                ctx.shadowColor = `hsl(${(i / 16) * 360 + timestamp * 0.05 + ring * 120}, 90%, 70%)`;
+                                ctx.shadowBlur = 10 + amplitude * 5;
+                                ctx.fill();
+                                ctx.shadowBlur = 0;
+                            }
+                        }
+
+                        ctx.restore();
+
+                        if (frameCount < 300) { // Run for 5 seconds at 60fps
+                            requestAnimationFrame(animate);
+                        } else {
+                            addStatus('✅ Demo visualization completed successfully', 'success');
+                        }
+                    };
+
+                    addStatus('🎬 Starting demo visualization...', 'info');
+                    requestAnimationFrame(animate);
+
+                } catch (error) {
+                    addStatus('❌ AudioContext test failed: ' + error.message, 'error');
+                }
+            }
+        }
+
+        // Test 5: Check result page
+        addStatus('🌐 Testing result page...', 'info');
+        fetch('/result')
+            .then(response => {
+                if (response.ok) {
+                    addStatus('✅ Result page accessible (HTTP ' + response.status + ')', 'success');
+                } else {
+                    addStatus('❌ Result page returned HTTP ' + response.status, 'error');
+                }
+            })
+            .catch(error => {
+                addStatus('❌ Result page test failed: ' + error.message, 'error');
+            });
+    </script>
+</body>
+</html>
