@@ -32,11 +32,9 @@ import { Slider } from '@/components/ui/slider'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
-import { VisualizationRenderer } from '@/lib/visualization/visualization-renderer'
+import { VisualizationEngine, getOptimalRenderConfig } from '@/lib/visualization'
 import { SupabaseService } from '@/lib/supabase/client'
-import { AudioProcessor } from '@/lib/audio/audio-processor'
-import { MicrophoneRecorder } from '@/lib/audio/microphone-recorder'
-import { StyleConfig } from '@/components/visualization/style-picker'
+import { StyleConfig, VisualizationStyle } from '@/components/visualization/style-picker'
 import { FrameRenderer, FrameStyle } from '@/lib/frames/frame-renderer'
 import { FrameSelector } from '@/components/frames/frame-selector'
 
@@ -79,11 +77,7 @@ const slideIn = {
 export default function ResultPage() {
   const router = useRouter()
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const animationRef = useRef<number>()
-  const audioContextRef = useRef<AudioContext>()
-  const rendererRef = useRef<VisualizationRenderer>()
-  const processorRef = useRef<AudioProcessor>()
-  const recorderRef = useRef<MicrophoneRecorder>()
+  const visualizationEngineRef = useRef<VisualizationEngine>()
   const isCanvasReady = useRef<boolean>(false)
 
   // State management
@@ -106,7 +100,7 @@ export default function ResultPage() {
 
   // Visualization settings
   const [audioFile, setAudioFile] = useState<any>(null)
-  const [selectedStyle, setSelectedStyle] = useState<string>('mandala')
+  const [selectedStyle, setSelectedStyle] = useState<VisualizationStyle['id']>('particles')
   const [styleConfig, setStyleConfig] = useState<StyleConfig>({
     sensitivity: 1,
     smoothing: 0.8,
@@ -152,7 +146,7 @@ export default function ResultPage() {
             console.warn('Failed to load demo audio:', error)
           }
 
-          setSelectedStyle('mandala')
+          setSelectedStyle('particles')
           setStyleConfig({
             sensitivity: 1.2,
             smoothing: 0.8,
@@ -203,7 +197,7 @@ export default function ResultPage() {
   // Initialize visualization system
   const initializeVisualization = async () => {
     try {
-      console.log('🚀 INITIALIZING VISUALIZATION...')
+      console.log('🚀 INITIALIZING NEW VISUALIZATION ENGINE...')
 
       if (!canvasRef.current) {
         console.error('❌ Canvas not found!')
@@ -212,18 +206,30 @@ export default function ResultPage() {
 
       console.log('📺 Canvas found:', canvasRef.current.width, 'x', canvasRef.current.height)
 
-      // Initialize audio context
-      audioContextRef.current = new AudioContext()
-      console.log('🔊 AudioContext created:', audioContextRef.current.state)
+      // Initialize new visualization engine
+      visualizationEngineRef.current = new VisualizationEngine({
+        enableOfflineMode: true
+      })
 
-      // Initialize processor and renderer
-      processorRef.current = new AudioProcessor(audioContextRef.current)
-      rendererRef.current = new VisualizationRenderer(canvasRef.current, selectedStyle as any)
-      console.log('🎛️ Processor and Renderer initialized')
+      await visualizationEngineRef.current.initialize()
+      console.log('🎛️ VisualizationEngine initialized')
 
-      // Configure renderer
-      rendererRef.current.updateConfig(styleConfig)
-      console.log('⚙️ Renderer configured with:', styleConfig)
+      // Get optimal render config
+      const renderConfig = getOptimalRenderConfig(canvasRef.current)
+      console.log('⚙️ Render config:', renderConfig)
+
+      // Load selected visualization mode
+      const success = await visualizationEngineRef.current.loadVisualizationMode(
+        selectedStyle,
+        canvasRef.current,
+        renderConfig
+      )
+
+      if (!success) {
+        throw new Error('Failed to load visualization mode')
+      }
+
+      console.log('✅ Visualization mode loaded:', selectedStyle)
 
       // Generate static image immediately
       console.log('🖼️ Generating static image in 100ms...')
@@ -240,16 +246,7 @@ export default function ResultPage() {
 
   // Cleanup resources
   const cleanup = () => {
-    if (animationRef.current) {
-      cancelAnimationFrame(animationRef.current)
-    }
-
-    processorRef.current?.stop()
-    recorderRef.current?.stop()
-
-    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-      audioContextRef.current.close()
-    }
+    visualizationEngineRef.current?.dispose()
   }
 
   // Generate static image visualization
@@ -257,29 +254,27 @@ export default function ResultPage() {
     try {
       console.log('🖼️ GENERATING STATIC VISUALIZATION!')
 
-      if (!rendererRef.current || !processorRef.current) {
-        console.error('❌ No renderer or processor found!')
+      if (!visualizationEngineRef.current) {
+        console.error('❌ No visualization engine found!')
         return
       }
 
-      console.log('✅ Renderer and processor exist, proceeding...')
+      console.log('✅ Visualization engine exists, proceeding...')
       setError(null)
       setIsPlaying(true)
 
-      // Analyze audio for static image generation
-      const audioAnalysis = await processorRef.current.analyzeAudioForStaticImage()
-
-      if (!audioAnalysis) {
-        console.error('❌ Failed to analyze audio!')
-        setError('오디오 분석에 실패했습니다.')
-        setIsPlaying(false)
-        return
+      // Load audio file if available
+      if (audioFile?.file) {
+        try {
+          await visualizationEngineRef.current.loadAudioFile(audioFile.file)
+          console.log('📊 Audio file loaded')
+        } catch (error) {
+          console.warn('Audio loading failed, using demo mode:', error)
+        }
       }
 
-      console.log('📊 Audio analysis successful:', audioAnalysis)
-
-      // Generate static visualization image
-      rendererRef.current.generateStaticImage(audioAnalysis)
+      // Start realtime visualization for demo
+      visualizationEngineRef.current.startRealtimeVisualization()
 
       console.log('🖼️ Static image generation complete!')
       setIsPlaying(false)
@@ -396,10 +391,7 @@ export default function ResultPage() {
   // Stop visualization
   const stopVisualization = () => {
     setIsPlaying(false)
-    if (animationRef.current) {
-      cancelAnimationFrame(animationRef.current)
-    }
-    processorRef.current?.stop()
+    visualizationEngineRef.current?.stopVisualization()
   }
 
   // Share to gallery
@@ -532,40 +524,12 @@ export default function ResultPage() {
         if (canvasRef.current && isCanvasReady.current) {
           console.log('🚀 Immediate initialization attempt...')
           try {
-            // Initialize visualization system
-            console.log('🚀 INITIALIZING VISUALIZATION...')
-
-            if (!canvasRef.current) {
-              console.error('❌ Canvas not found!')
-              return
-            }
-
-            console.log('📺 Canvas found:', canvasRef.current.width, 'x', canvasRef.current.height)
-
-            // Initialize audio context
-            audioContextRef.current = new AudioContext()
-            console.log('🔊 AudioContext created:', audioContextRef.current.state)
-
-            // Initialize processor and renderer
-            processorRef.current = new AudioProcessor(audioContextRef.current)
-            rendererRef.current = new VisualizationRenderer(canvasRef.current, selectedStyle as any)
-            console.log('🎛️ Processor and Renderer initialized')
-
-            // Configure renderer
-            rendererRef.current.updateConfig(styleConfig)
-            console.log('⚙️ Renderer configured with:', styleConfig)
-
-            // Generate static image immediately
-            console.log('🖼️ Generating static image in 100ms...')
-            setTimeout(() => {
-              console.log('🖼️ NOW GENERATING STATIC IMAGE!')
-              generateStaticVisualization()
-            }, 100)
-
+            await initializeVisualization()
             setIsLoading(false)
           } catch (error) {
             console.error('❌ Immediate initialization failed:', error)
             setError('시각화 시스템 초기화에 실패했습니다.')
+            setIsLoading(false)
           }
         }
       }, 50)
