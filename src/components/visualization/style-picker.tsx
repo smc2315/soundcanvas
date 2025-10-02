@@ -196,7 +196,7 @@ export function StylePicker({
         {/* Tab Navigation */}
         <TabsList className="grid w-full grid-cols-2 mb-8">
           <TabsTrigger value="styles" className="flex items-center gap-2">
-            <Palette size={16} />
+            <PaletteIcon size={16} />
             스타일 선택
           </TabsTrigger>
           <TabsTrigger value="settings" className="flex items-center gap-2">
