@@ -1,271 +1,484 @@
-// Main visualization exports
-export { VisualizationFactory } from './visualization-factory'
-export { BaseVisualizationRenderer } from './base-renderer'
+/**
+ * Main visualization system entry point
+ * Comprehensive audio visualization platform with plugin architecture
+ */
 
-// Renderer exports
-export { MandalaRenderer } from './renderers/mandala-renderer'
-export { InkFlowRenderer } from './renderers/inkflow-renderer'
-export { NeonGridRenderer } from './renderers/neongrid-renderer'
+import { RealtimeAudioAnalyser } from '../audio/analyser'
+import { OfflineAudioAnalyser } from '../audio/offline'
+import { ImageExporter } from '../export/image'
+import { VideoExporter } from '../export/video'
+import {
+  Visualizer,
+  VisualizationMode,
+  RenderConfig,
+  RenderFrame,
+  AudioFeatures,
+  ExportOptions
+} from './core/types'
 
-// Utility exports
-export * from './utils'
+// Import available visualization modes
+const VISUALIZATION_MODES = [
+  () => import('./modes/mode-spectrum-3d'),
+  () => import('./modes/mode-particles'),
+  () => import('./modes/mode-spectrogram-art'),
+  () => import('./modes/mode-cozy-abstract'),
+  () => import('./modes/mode-ml-emotion')
+]
 
-// Type exports
-export type {
-  VisualizationStyle,
-  VisualizationConfig,
-  VisualizationRenderer,
-  VisualizationExportOptions,
-  MandalaConfig,
-  InkFlowConfig,
-  NeonGridConfig,
-  RenderingContext,
-  PerformanceMetrics,
-  Vector2,
-  Color,
-  Particle,
-  ParticleSystem,
-  FrameOverlayConfig,
-  AnimationState,
-  VisualizationFrame,
-  Gradient,
-  ColorStop
-} from './types'
+export interface VisualizationEngineConfig {
+  sampleRate: number
+  fftSize: number
+  smoothingTimeConstant: number
+  minDecibels: number
+  maxDecibels: number
+  enableOfflineMode: boolean
+}
 
-// Main visualization manager class
-import type {
-  VisualizationStyle,
-  VisualizationConfig,
-  VisualizationRenderer,
-  VisualizationExportOptions,
-  PerformanceMetrics
-} from './types'
-import type { VisualizationData } from '../audio/types'
-import { VisualizationFactory } from './visualization-factory'
+/**
+ * Registry for managing visualization modes with dynamic loading
+ */
+export class VisualizationRegistry {
+  private modes: Map<string, VisualizationMode> = new Map()
+  private visualizers: Map<string, () => Promise<any>> = new Map()
+  private loadedVisualizers: Map<string, new () => Visualizer> = new Map()
 
-export class VisualizationManager {
-  private currentRenderer: VisualizationRenderer | null = null
-  private canvas: HTMLCanvasElement | null = null
-  private animationFrame: number | null = null
-  private isRunning: boolean = false
-  private lastFrameTime: number = 0
+  async initialize(): Promise<void> {
+    // Load all visualization modes
+    const loadPromises = VISUALIZATION_MODES.map(async (importFn, index) => {
+      try {
+        const module = await importFn()
+        const VisualizerClass = Object.values(module)[0] as new () => Visualizer
+        const instance = new VisualizerClass()
 
-  // Event callbacks
-  private onRenderCallback?: (performance: PerformanceMetrics) => void
-  private onErrorCallback?: (error: Error) => void
+        this.modes.set(instance.id, instance.mode)
+        this.loadedVisualizers.set(instance.id, VisualizerClass)
+        this.visualizers.set(instance.id, importFn)
 
-  constructor(
-    private onRender?: (performance: PerformanceMetrics) => void,
-    private onError?: (error: Error) => void
-  ) {
-    this.onRenderCallback = onRender
-    this.onErrorCallback = onError
+        return instance.mode
+      } catch (error) {
+        console.warn(`Failed to load visualization mode ${index}:`, error)
+        return null
+      }
+    })
+
+    const loadedModes = await Promise.all(loadPromises)
+    console.log(`Loaded ${loadedModes.filter(Boolean).length} visualization modes`)
   }
 
-  async initialize(
-    canvas: HTMLCanvasElement,
-    style: VisualizationStyle,
-    config?: Partial<VisualizationConfig>
-  ): Promise<void> {
+  getAvailableModes(): VisualizationMode[] {
+    return Array.from(this.modes.values())
+  }
+
+  getModeById(id: string): VisualizationMode | null {
+    return this.modes.get(id) || null
+  }
+
+  getModesByCategory(category: string): VisualizationMode[] {
+    return Array.from(this.modes.values()).filter(mode => mode.category === category)
+  }
+
+  getModesByTag(tag: string): VisualizationMode[] {
+    return Array.from(this.modes.values()).filter(mode => mode.tags.includes(tag))
+  }
+
+  async createVisualizer(modeId: string): Promise<Visualizer | null> {
+    const VisualizerClass = this.loadedVisualizers.get(modeId)
+    if (!VisualizerClass) {
+      console.error(`Visualizer not found: ${modeId}`)
+      return null
+    }
+
     try {
-      this.canvas = canvas
-
-      // Create renderer
-      this.currentRenderer = VisualizationFactory.createRenderer(style, config)
-
-      // Initialize renderer
-      const fullConfig = VisualizationFactory.getDefaultConfig(style)
-      if (config) {
-        Object.assign(fullConfig, config)
-      }
-
-      this.currentRenderer.initialize(canvas, fullConfig)
-
+      return new VisualizerClass()
     } catch (error) {
-      this.handleError(error as Error)
-      throw error
+      console.error(`Failed to create visualizer ${modeId}:`, error)
+      return null
     }
   }
 
-  start(): void {
-    if (!this.currentRenderer || this.isRunning) return
+  getRecommendedModes(preferences: {
+    supports3D?: boolean
+    supportsRealtime?: boolean
+    category?: string
+    mood?: 'energetic' | 'calm' | 'dynamic' | 'artistic'
+  }): VisualizationMode[] {
+    let modes = Array.from(this.modes.values())
 
-    this.isRunning = true
-    this.lastFrameTime = performance.now()
+    if (preferences.supports3D !== undefined) {
+      modes = modes.filter(mode => mode.supports3D === preferences.supports3D)
+    }
+
+    if (preferences.supportsRealtime !== undefined) {
+      modes = modes.filter(mode => mode.supportsRealtime === preferences.supportsRealtime)
+    }
+
+    if (preferences.category) {
+      modes = modes.filter(mode => mode.category === preferences.category)
+    }
+
+    if (preferences.mood) {
+      modes = modes.filter(mode =>
+        mode.defaultParams.palette.mood === preferences.mood ||
+        mode.tags.includes(preferences.mood)
+      )
+    }
+
+    return modes
+  }
+}
+
+/**
+ * Main visualization engine coordinating audio analysis, visualization, and export
+ */
+export class VisualizationEngine {
+  private registry: VisualizationRegistry
+  private audioAnalyser: RealtimeAudioAnalyser | null = null
+  private offlineAnalyser: OfflineAudioAnalyser | null = null
+  private currentVisualizer: Visualizer | null = null
+  private imageExporter: ImageExporter | null = null
+  private videoExporter: VideoExporter | null = null
+
+  // Animation state
+  private animationId: number | null = null
+  private isPlaying = false
+  private startTime = 0
+  private lastFrameTime = 0
+  private frameCount = 0
+
+  // Configuration
+  private config: VisualizationEngineConfig = {
+    sampleRate: 44100,
+    fftSize: 2048,
+    smoothingTimeConstant: 0.8,
+    minDecibels: -100,
+    maxDecibels: -30,
+    enableOfflineMode: false
+  }
+
+  // Event callbacks
+  private onFrameCallback?: (frame: RenderFrame) => void
+  private onErrorCallback?: (error: Error) => void
+
+  constructor(config?: Partial<VisualizationEngineConfig>) {
+    this.registry = new VisualizationRegistry()
+    if (config) {
+      this.config = { ...this.config, ...config }
+    }
+  }
+
+  async initialize(): Promise<void> {
+    await this.registry.initialize()
+
+    // Initialize audio analysers
+    this.audioAnalyser = new RealtimeAudioAnalyser({
+      fftSize: this.config.fftSize,
+      smoothingTimeConstant: this.config.smoothingTimeConstant,
+      minDecibels: this.config.minDecibels,
+      maxDecibels: this.config.maxDecibels
+    })
+
+    if (this.config.enableOfflineMode) {
+      this.offlineAnalyser = new OfflineAudioAnalyser({
+        sampleRate: this.config.sampleRate,
+        fftSize: this.config.fftSize
+      })
+    }
+  }
+
+  getRegistry(): VisualizationRegistry {
+    return this.registry
+  }
+
+  async loadVisualizationMode(
+    modeId: string,
+    canvas: HTMLCanvasElement | OffscreenCanvas,
+    renderConfig: RenderConfig
+  ): Promise<boolean> {
+    try {
+      // Dispose current visualizer
+      if (this.currentVisualizer) {
+        this.currentVisualizer.dispose()
+      }
+
+      // Create new visualizer
+      this.currentVisualizer = await this.registry.createVisualizer(modeId)
+      if (!this.currentVisualizer) {
+        throw new Error(`Failed to create visualizer: ${modeId}`)
+      }
+
+      // Initialize visualizer
+      await this.currentVisualizer.init(canvas, renderConfig)
+
+      // Initialize exporters
+      this.imageExporter = new ImageExporter(this.currentVisualizer)
+      this.videoExporter = new VideoExporter(this.currentVisualizer, this.offlineAnalyser!)
+
+      return true
+    } catch (error) {
+      this.handleError(error as Error)
+      return false
+    }
+  }
+
+  async connectAudioSource(source: MediaStreamAudioSourceNode | MediaElementAudioSourceNode): Promise<void> {
+    if (!this.audioAnalyser) {
+      throw new Error('Audio analyser not initialized')
+    }
+
+    await this.audioAnalyser.connectSource(source)
+  }
+
+  async loadAudioFile(file: File): Promise<void> {
+    if (!this.audioAnalyser) {
+      throw new Error('Audio analyser not initialized')
+    }
+
+    await this.audioAnalyser.loadAudioFile(file)
+  }
+
+  startRealtimeVisualization(): void {
+    if (!this.currentVisualizer || !this.audioAnalyser || this.isPlaying) {
+      return
+    }
+
+    this.isPlaying = true
+    this.startTime = performance.now()
+    this.lastFrameTime = this.startTime
+    this.frameCount = 0
+
     this.renderLoop()
   }
 
-  stop(): void {
-    this.isRunning = false
-    if (this.animationFrame) {
-      cancelAnimationFrame(this.animationFrame)
-      this.animationFrame = null
+  stopVisualization(): void {
+    this.isPlaying = false
+    if (this.animationId) {
+      cancelAnimationFrame(this.animationId)
+      this.animationId = null
     }
   }
 
-  render(audioData: VisualizationData): void {
-    if (!this.currentRenderer || !this.isRunning) return
+  private renderLoop = (): void => {
+    if (!this.isPlaying || !this.currentVisualizer || !this.audioAnalyser) {
+      return
+    }
+
+    const currentTime = performance.now()
+    const deltaTime = currentTime - this.lastFrameTime
+    const elapsedTime = currentTime - this.startTime
+
+    // Get audio features
+    const audioFeatures = this.audioAnalyser.getFeatures()
+
+    // Update visualizer with audio data
+    this.currentVisualizer.update(audioFeatures)
+
+    // Create render frame
+    const renderFrame: RenderFrame = {
+      frameIndex: this.frameCount,
+      timePosition: elapsedTime / 1000,
+      canvas: this.currentVisualizer.getCanvas(),
+      context: this.currentVisualizer.getContext(),
+      features: audioFeatures,
+      params: this.currentVisualizer.getParams()
+    }
+
+    // Render frame
+    this.currentVisualizer.renderFrame(renderFrame)
+
+    // Call frame callback
+    if (this.onFrameCallback) {
+      this.onFrameCallback(renderFrame)
+    }
+
+    this.frameCount++
+    this.lastFrameTime = currentTime
+
+    // Schedule next frame
+    this.animationId = requestAnimationFrame(this.renderLoop)
+  }
+
+  async exportCurrentFrame(options?: Partial<any>): Promise<Blob | null> {
+    if (!this.imageExporter) {
+      console.error('Image exporter not available')
+      return null
+    }
 
     try {
-      const currentTime = performance.now()
-      const deltaTime = currentTime - this.lastFrameTime
-      this.lastFrameTime = currentTime
-
-      this.currentRenderer.render(audioData, deltaTime)
-
-      // Report performance metrics
-      if (this.onRenderCallback) {
-        const metrics = this.currentRenderer.getPerformanceMetrics()
-        this.onRenderCallback(metrics)
-      }
+      return await this.imageExporter.exportCurrentFrame(options)
     } catch (error) {
       this.handleError(error as Error)
+      return null
     }
   }
 
-  async switchStyle(
-    style: VisualizationStyle,
-    config?: Partial<VisualizationConfig>
-  ): Promise<void> {
-    if (!this.canvas) {
-      throw new Error('Canvas not initialized')
+  async exportVideo(
+    audioFile: File,
+    options: any,
+    onProgress?: (progress: number) => void
+  ): Promise<Blob | null> {
+    if (!this.videoExporter) {
+      console.error('Video exporter not available')
+      return null
     }
-
-    // Stop current rendering
-    const wasRunning = this.isRunning
-    this.stop()
-
-    // Dispose current renderer
-    if (this.currentRenderer) {
-      this.currentRenderer.dispose()
-    }
-
-    // Initialize new renderer
-    await this.initialize(this.canvas, style, config)
-
-    // Resume rendering if it was running
-    if (wasRunning) {
-      this.start()
-    }
-  }
-
-  updateConfig(config: Partial<VisualizationConfig>): void {
-    if (!this.currentRenderer) return
 
     try {
-      this.currentRenderer.updateConfig(config)
+      return await this.videoExporter.exportVideo(audioFile, options, onProgress)
     } catch (error) {
       this.handleError(error as Error)
+      return null
     }
   }
 
-  resize(width: number, height: number): void {
-    if (!this.currentRenderer) return
-
-    try {
-      this.currentRenderer.resize(width, height)
-    } catch (error) {
-      this.handleError(error as Error)
-    }
-  }
-
-  async exportFrame(options?: Partial<VisualizationExportOptions>): Promise<Blob> {
-    if (!this.currentRenderer) {
-      throw new Error('No renderer initialized')
+  async renderOfflineSequence(
+    audioFile: File,
+    timeRange: { start: number; end: number; fps: number },
+    onProgress?: (progress: number) => void
+  ): Promise<Blob[]> {
+    if (!this.offlineAnalyser || !this.currentVisualizer || !this.imageExporter) {
+      throw new Error('Offline rendering not available')
     }
 
     try {
-      return await this.currentRenderer.exportFrame(options)
+      // Load audio file for offline analysis
+      await this.offlineAnalyser.loadAudioFile(audioFile)
+
+      // Export frame sequence
+      return await this.imageExporter.exportFrameSequence(timeRange)
     } catch (error) {
       this.handleError(error as Error)
       throw error
     }
   }
 
-  getConfig(): VisualizationConfig | null {
-    return this.currentRenderer?.getConfig() || null
+  getCurrentVisualizer(): Visualizer | null {
+    return this.currentVisualizer
   }
 
-  getPerformanceMetrics(): PerformanceMetrics | null {
-    return this.currentRenderer?.getPerformanceMetrics() || null
+  getCurrentMode(): VisualizationMode | null {
+    return this.currentVisualizer?.mode || null
   }
 
-  getSupportedStyles(): VisualizationStyle[] {
-    return VisualizationFactory.getSupportedStyles()
-  }
-
-  dispose(): void {
-    this.stop()
-
-    if (this.currentRenderer) {
-      this.currentRenderer.dispose()
-      this.currentRenderer = null
+  updateVisualizerParams(params: Partial<any>): void {
+    if (this.currentVisualizer) {
+      this.currentVisualizer.updateParams(params)
     }
-
-    this.canvas = null
-    this.onRenderCallback = undefined
-    this.onErrorCallback = undefined
   }
 
-  private renderLoop = (): void => {
-    if (!this.isRunning) return
+  getAudioFeatures(): AudioFeatures | null {
+    return this.audioAnalyser?.getFeatures() || null
+  }
 
-    // Note: This render loop expects external audio data
-    // In practice, this would be called from a component that has access to audio data
+  isVisualizationPlaying(): boolean {
+    return this.isPlaying
+  }
 
-    this.animationFrame = requestAnimationFrame(this.renderLoop)
+  getFrameCount(): number {
+    return this.frameCount
+  }
+
+  getElapsedTime(): number {
+    return this.isPlaying ? (performance.now() - this.startTime) / 1000 : 0
+  }
+
+  // Event handlers
+  onFrame(callback: (frame: RenderFrame) => void): void {
+    this.onFrameCallback = callback
+  }
+
+  onError(callback: (error: Error) => void): void {
+    this.onErrorCallback = callback
   }
 
   private handleError(error: Error): void {
-    console.error('VisualizationManager error:', error)
-
+    console.error('VisualizationEngine error:', error)
     if (this.onErrorCallback) {
       this.onErrorCallback(error)
     }
   }
+
+  dispose(): void {
+    this.stopVisualization()
+
+    if (this.currentVisualizer) {
+      this.currentVisualizer.dispose()
+      this.currentVisualizer = null
+    }
+
+    if (this.audioAnalyser) {
+      this.audioAnalyser.dispose()
+      this.audioAnalyser = null
+    }
+
+    if (this.offlineAnalyser) {
+      this.offlineAnalyser.dispose()
+      this.offlineAnalyser = null
+    }
+
+    this.imageExporter = null
+    this.videoExporter = null
+    this.onFrameCallback = undefined
+    this.onErrorCallback = undefined
+  }
 }
 
-// Utility function to detect device capabilities
-export function getDeviceCapabilities(): {
-  isMobile: boolean
-  lowPowerMode: boolean
-  memoryLimited: boolean
-  maxTextureSize: number
-  supportsWebGL: boolean
-} {
+// Utility functions for device capabilities and performance optimization
+export function getOptimalRenderConfig(
+  targetCanvas: HTMLCanvasElement | OffscreenCanvas
+): RenderConfig {
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+  const pixelRatio = Math.min(window.devicePixelRatio || 1, 2) // Cap at 2x for performance
 
-  // Estimate memory limitation
-  const memoryLimited = 'deviceMemory' in navigator
-    ? (navigator as any).deviceMemory < 4
-    : isMobile
+  const canvas = targetCanvas as HTMLCanvasElement
+  const width = canvas.width || 800
+  const height = canvas.height || 600
 
-  // Check for low power mode (approximate)
-  const lowPowerMode = 'getBattery' in navigator
-    ? false // Would need async battery API check
-    : isMobile && window.innerWidth < 768
+  return {
+    width,
+    height,
+    pixelRatio: isMobile ? 1 : pixelRatio,
+    fps: isMobile ? 30 : 60,
+    backgroundColor: '#000000',
+    seed: Date.now()
+  }
+}
 
-  // Check WebGL support and max texture size
-  let maxTextureSize = 2048
-  let supportsWebGL = false
+export function detectAudioCapabilities(): {
+  supportsWebAudio: boolean
+  supportsMediaRecorder: boolean
+  supportsOfflineAudioContext: boolean
+  maxSampleRate: number
+} {
+  const AudioContext = window.AudioContext || (window as any).webkitAudioContext
 
-  try {
-    const canvas = document.createElement('canvas')
-    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl')
+  let maxSampleRate = 44100
+  let supportsOfflineAudioContext = false
 
-    if (gl) {
-      supportsWebGL = true
-      maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE) || 2048
+  if (AudioContext) {
+    try {
+      const ctx = new AudioContext()
+      maxSampleRate = ctx.sampleRate
+      ctx.close()
+
+      supportsOfflineAudioContext = 'OfflineAudioContext' in window || 'webkitOfflineAudioContext' in window
+    } catch (e) {
+      // AudioContext not supported
     }
-  } catch {
-    // WebGL not supported
   }
 
   return {
-    isMobile,
-    lowPowerMode,
-    memoryLimited,
-    maxTextureSize,
-    supportsWebGL
+    supportsWebAudio: !!AudioContext,
+    supportsMediaRecorder: 'MediaRecorder' in window,
+    supportsOfflineAudioContext,
+    maxSampleRate
   }
 }
+
+// Re-export core types and classes
+export * from './core/types'
+export * from './core/palettes'
+export * from './core/mapping'
+export * from './core/rng'
+export { ImageExporter } from '../export/image'
+export { VideoExporter } from '../export/video'
+export { RealtimeAudioAnalyser } from '../audio/analyser'
+export { OfflineAudioAnalyser } from '../audio/offline'
