@@ -1820,50 +1820,125 @@ export class VisualizationRenderer {
   }
 
   private drawHolographicGrid(audioAnalysis: { frequencyData: Uint8Array, amplitude: number, duration: number }, seed: number): void {
-    const gridSize = 40
-    const cellWidth = this.canvas.width / gridSize
-    const cellHeight = this.canvas.height / gridSize
+    const gridSize = 30
     const frequencyData = audioAnalysis.frequencyData
 
     this.ctx.globalCompositeOperation = 'screen'
-    this.ctx.globalAlpha = 0.3
+    this.ctx.globalAlpha = 0.4
 
-    for (let x = 0; x < gridSize; x++) {
-      for (let y = 0; y < gridSize; y++) {
-        const cellX = x * cellWidth
-        const cellY = y * cellHeight
+    // Create 3D perspective grid like the reference image
+    const vanishingPointX = this.canvas.width * 0.5
+    const vanishingPointY = this.canvas.height * 0.5
+    const gridDepth = Math.min(this.canvas.width, this.canvas.height) * 0.6
 
-        // Create perspective effect - stronger toward center
-        const centerX = gridSize / 2
-        const centerY = gridSize / 2
-        const distanceFromCenter = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2)
-        const maxDistance = Math.sqrt(centerX ** 2 + centerY ** 2)
-        const perspectiveIntensity = 1 - (distanceFromCenter / maxDistance) * 0.7
+    // Draw perspective grid lines toward vanishing point
+    for (let i = 0; i < gridSize; i++) {
+      const progress = i / gridSize
+      const freqIndex = Math.floor(progress * frequencyData.length)
+      const freqValue = frequencyData[freqIndex] || 15
+      const intensity = (freqValue / 255)
 
-        const freqIndex = Math.floor(((x + y) / (gridSize * 2)) * frequencyData.length)
-        const freqValue = frequencyData[freqIndex] || 20
-        const intensity = (freqValue / 255) * perspectiveIntensity
+      if (intensity < 0.15) continue
 
-        if (intensity > 0.2) {
-          // Create grid lines with perspective
-          const lineWidth = intensity * 2
-          const opacity = intensity * 0.8
-          const hue = 180 + (x + y) * 3 + seed * 0.1
+      // Calculate 3D depth and perspective
+      const virtualZ = progress * gridDepth
+      const perspective = 1 / (1 + virtualZ / gridDepth * 0.8)
 
-          this.ctx.strokeStyle = `hsla(${hue}, 90%, 70%, ${opacity})`
-          this.ctx.lineWidth = lineWidth
+      // Grid dimensions at this depth
+      const gridWidth = this.canvas.width * perspective * (0.8 + progress * 0.4)
+      const gridHeight = this.canvas.height * perspective * (0.8 + progress * 0.4)
 
-          // Horizontal lines
+      // Position with perspective distortion
+      const gridLeft = vanishingPointX - gridWidth / 2
+      const gridTop = vanishingPointY - gridHeight / 2
+      const gridRight = vanishingPointX + gridWidth / 2
+      const gridBottom = vanishingPointY + gridHeight / 2
+
+      // Depth-based styling
+      const depthIntensity = (1 - progress * 0.6) * intensity
+      const brightness = 50 + depthIntensity * 40
+      const opacity = depthIntensity * 0.7
+
+      if (opacity < 0.05) continue
+
+      const hue = 160 + i * 8 + (freqValue / 255) * 120 + seed * 0.1
+      const lineWidth = (1 + intensity * 4) * perspective
+
+      // Horizontal grid lines
+      const horizontalLines = 8 + Math.floor(intensity * 6)
+      for (let h = 0; h <= horizontalLines; h++) {
+        const lineY = gridTop + (h / horizontalLines) * gridHeight
+
+        // Add curvature for 3D effect
+        const curvature = Math.sin((h / horizontalLines) * Math.PI) * virtualZ * 0.02
+
+        this.ctx.beginPath()
+        this.ctx.moveTo(gridLeft, lineY + curvature)
+
+        // Create curved line segments
+        const segments = 20
+        for (let seg = 1; seg <= segments; seg++) {
+          const segmentProgress = seg / segments
+          const segmentX = gridLeft + segmentProgress * gridWidth
+          const segmentCurvature = Math.sin(segmentProgress * Math.PI) * virtualZ * 0.01
+          this.ctx.lineTo(segmentX, lineY + curvature + segmentCurvature)
+        }
+
+        // Apply gradient for 3D lighting
+        const lineGradient = this.ctx.createLinearGradient(gridLeft, lineY, gridRight, lineY)
+        lineGradient.addColorStop(0, `hsla(${hue}, 85%, ${brightness * 0.7}%, ${opacity * 0.5})`)
+        lineGradient.addColorStop(0.5, `hsla(${hue + 10}, 90%, ${brightness}%, ${opacity})`)
+        lineGradient.addColorStop(1, `hsla(${hue}, 85%, ${brightness * 0.7}%, ${opacity * 0.5})`)
+
+        this.ctx.strokeStyle = lineGradient
+        this.ctx.lineWidth = lineWidth
+        this.ctx.stroke()
+      }
+
+      // Vertical grid lines with perspective
+      const verticalLines = 8 + Math.floor(intensity * 6)
+      for (let v = 0; v <= verticalLines; v++) {
+        const lineX = gridLeft + (v / verticalLines) * gridWidth
+
+        this.ctx.beginPath()
+        this.ctx.moveTo(lineX, gridTop)
+
+        // Create perspective-distorted vertical lines
+        const segments = 15
+        for (let seg = 1; seg <= segments; seg++) {
+          const segmentProgress = seg / segments
+          const segmentY = gridTop + segmentProgress * gridHeight
+
+          // Perspective distortion - lines converge toward vanishing point
+          const distortionFactor = segmentProgress * virtualZ * 0.0005
+          const distortedX = lineX + (vanishingPointX - lineX) * distortionFactor
+
+          this.ctx.lineTo(distortedX, segmentY)
+        }
+
+        this.ctx.strokeStyle = `hsla(${hue + 20}, 90%, ${brightness}%, ${opacity * 0.8})`
+        this.ctx.lineWidth = lineWidth * 0.8
+        this.ctx.stroke()
+      }
+
+      // Add intersection glow points
+      if (i % 3 === 0) {
+        const intersectionPoints = 5
+        for (let p = 0; p < intersectionPoints; p++) {
+          const pointX = gridLeft + Math.random() * gridWidth
+          const pointY = gridTop + Math.random() * gridHeight
+          const pointIntensity = intensity * (0.5 + Math.random() * 0.5)
+
           this.ctx.beginPath()
-          this.ctx.moveTo(cellX, cellY)
-          this.ctx.lineTo(cellX + cellWidth, cellY)
-          this.ctx.stroke()
+          this.ctx.arc(pointX, pointY, 2 + pointIntensity * 6, 0, Math.PI * 2)
 
-          // Vertical lines
-          this.ctx.beginPath()
-          this.ctx.moveTo(cellX, cellY)
-          this.ctx.lineTo(cellX, cellY + cellHeight)
-          this.ctx.stroke()
+          const pointGradient = this.ctx.createRadialGradient(pointX, pointY, 0, pointX, pointY, 8 + pointIntensity * 12)
+          pointGradient.addColorStop(0, `hsla(${hue + 60}, 100%, 90%, ${pointIntensity * 0.8})`)
+          pointGradient.addColorStop(0.5, `hsla(${hue + 40}, 90%, 75%, ${pointIntensity * 0.5})`)
+          pointGradient.addColorStop(1, `hsla(${hue + 20}, 80%, 60%, 0)`)
+
+          this.ctx.fillStyle = pointGradient
+          this.ctx.fill()
         }
       }
     }
@@ -1904,63 +1979,135 @@ export class VisualizationRenderer {
     this.ctx.translate(x, y)
     this.ctx.rotate(rotation)
 
-    // Create 3D diamond/crystal shape
-    const vertices = [
-      { x: 0, y: -size },           // top
-      { x: size * 0.6, y: -size * 0.3 },  // top-right
-      { x: size * 0.6, y: size * 0.3 },   // bottom-right
-      { x: 0, y: size },            // bottom
-      { x: -size * 0.6, y: size * 0.3 },  // bottom-left
-      { x: -size * 0.6, y: -size * 0.3 }  // top-left
+    // Enhanced 3D crystal with proper depth and perspective
+    const depth = size * 0.5 // Z-depth simulation
+    const lightAngle = Math.PI / 4 // Light source angle
+
+    // 3D vertices with simulated Z coordinate
+    const vertices3D = [
+      { x: 0, y: -size, z: 0 },                    // top center
+      { x: size * 0.7, y: -size * 0.3, z: depth * 0.3 },   // top-right-front
+      { x: size * 0.7, y: size * 0.3, z: depth * 0.3 },    // bottom-right-front
+      { x: 0, y: size, z: 0 },                     // bottom center
+      { x: -size * 0.7, y: size * 0.3, z: depth * 0.3 },   // bottom-left-front
+      { x: -size * 0.7, y: -size * 0.3, z: depth * 0.3 },  // top-left-front
+      { x: size * 0.4, y: -size * 0.2, z: -depth * 0.5 },  // top-right-back
+      { x: size * 0.4, y: size * 0.2, z: -depth * 0.5 },   // bottom-right-back
+      { x: -size * 0.4, y: size * 0.2, z: -depth * 0.5 },  // bottom-left-back
+      { x: -size * 0.4, y: -size * 0.2, z: -depth * 0.5 }  // top-left-back
     ]
 
-    // Multiple faces for 3D effect
+    // Project 3D vertices to 2D with perspective
+    const projectedVertices = vertices3D.map(v => {
+      const perspective = 1 / (1 + v.z / (size * 2)) // Simple perspective projection
+      return {
+        x: v.x * perspective,
+        y: v.y * perspective,
+        z: v.z,
+        brightness: (v.z + depth) / (depth * 2) // Z-based brightness
+      }
+    })
+
+    // Define crystal faces with proper z-sorting
     const faces = [
-      [0, 1, 3, 4], // main diamond
-      [0, 1, 2],    // top-right face
-      [0, 5, 4],    // top-left face
-      [3, 2, 1],    // bottom-right face
-      [3, 4, 5]     // bottom-left face
+      { vertices: [0, 1, 2, 3, 4, 5], z: depth * 0.2, type: 'front' },     // front face
+      { vertices: [0, 6, 7, 3, 8, 9], z: -depth * 0.3, type: 'back' },     // back face
+      { vertices: [1, 6, 7, 2], z: depth * 0.1, type: 'right' },           // right face
+      { vertices: [5, 9, 8, 4], z: depth * 0.1, type: 'left' },            // left face
+      { vertices: [0, 1, 6, 9, 5], z: -depth * 0.1, type: 'top' },         // top face
+      { vertices: [3, 2, 7, 8, 4], z: -depth * 0.1, type: 'bottom' }       // bottom face
     ]
+
+    // Sort faces by z-depth for proper rendering order
+    faces.sort((a, b) => a.z - b.z)
 
     faces.forEach((face, faceIndex) => {
       this.ctx.beginPath()
-      this.ctx.moveTo(vertices[face[0]].x, vertices[face[0]].y)
-      face.forEach(vertexIndex => {
-        this.ctx.lineTo(vertices[vertexIndex].x, vertices[vertexIndex].y)
+      const firstVertex = projectedVertices[face.vertices[0]]
+      this.ctx.moveTo(firstVertex.x, firstVertex.y)
+
+      face.vertices.forEach(vertexIndex => {
+        const vertex = projectedVertices[vertexIndex]
+        this.ctx.lineTo(vertex.x, vertex.y)
       })
       this.ctx.closePath()
 
-      // Different brightness for each face (3D lighting effect)
-      const faceBrightness = 0.3 + faceIndex * 0.15
-      const hue = 240 + (freqValue / 255) * 120 + index * 8
-      const saturation = 80 + intensity * 20
-      const lightness = 40 + faceBrightness * 40 + intensity * 30
-      const alpha = intensity * (0.6 + faceIndex * 0.1)
+      // Advanced 3D lighting calculation
+      const faceNormal = this.calculateFaceNormal(face, projectedVertices)
+      const lightIntensity = Math.max(0.2, Math.abs(faceNormal.dot))
+      const shadowIntensity = 1 - lightIntensity
 
-      // Gradient fill for depth
-      const faceGradient = this.ctx.createRadialGradient(0, 0, 0, 0, 0, size)
-      faceGradient.addColorStop(0, `hsla(${hue}, ${saturation}%, ${lightness + 20}%, ${alpha})`)
-      faceGradient.addColorStop(0.7, `hsla(${hue + 20}, ${saturation - 10}%, ${lightness}%, ${alpha * 0.8})`)
-      faceGradient.addColorStop(1, `hsla(${hue + 40}, ${saturation - 20}%, ${lightness - 15}%, ${alpha * 0.4})`)
+      const baseHue = 240 + (freqValue / 255) * 120 + index * 8
+      const saturation = 85 + intensity * 15
+      const baseLightness = 45 + lightIntensity * 35 + intensity * 25
+      const alpha = intensity * (0.7 + lightIntensity * 0.3)
+
+      // Create sophisticated 3D gradient
+      const centerX = face.vertices.reduce((sum, idx) => sum + projectedVertices[idx].x, 0) / face.vertices.length
+      const centerY = face.vertices.reduce((sum, idx) => sum + projectedVertices[idx].y, 0) / face.vertices.length
+
+      const faceGradient = this.ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, size * 0.8)
+
+      // Highlight (light reflection)
+      faceGradient.addColorStop(0, `hsla(${baseHue + 40}, ${saturation + 10}%, ${Math.min(95, baseLightness + 30)}%, ${alpha})`)
+      // Main color
+      faceGradient.addColorStop(0.4, `hsla(${baseHue}, ${saturation}%, ${baseLightness}%, ${alpha * 0.9})`)
+      // Shadow transition
+      faceGradient.addColorStop(0.8, `hsla(${baseHue - 20}, ${saturation - 15}%, ${baseLightness - 20}%, ${alpha * 0.7})`)
+      // Deep shadow
+      faceGradient.addColorStop(1, `hsla(${baseHue - 40}, ${saturation - 25}%, ${Math.max(10, baseLightness - 35)}%, ${alpha * 0.4})`)
 
       this.ctx.fillStyle = faceGradient
       this.ctx.fill()
 
-      // Bright edges for crystal effect
-      this.ctx.strokeStyle = `hsla(${hue}, 100%, 80%, ${alpha * 0.8})`
-      this.ctx.lineWidth = 1 + intensity * 2
+      // Enhanced edge rendering with depth-based thickness
+      const edgeThickness = (1 + intensity * 3) * (0.5 + lightIntensity * 1.5)
+      this.ctx.strokeStyle = `hsla(${baseHue + 60}, 100%, ${80 + lightIntensity * 15}%, ${alpha * (0.6 + lightIntensity * 0.4)})`
+      this.ctx.lineWidth = edgeThickness
       this.ctx.stroke()
     })
 
-    // Add inner glow
-    this.ctx.beginPath()
-    this.ctx.arc(0, 0, size * 0.3, 0, Math.PI * 2)
-    const glowHue = 200 + (freqValue / 255) * 160
-    this.ctx.fillStyle = `hsla(${glowHue}, 100%, 90%, ${intensity * 0.4})`
-    this.ctx.fill()
+    // Enhanced inner glow with 3D depth
+    for (let glowLayer = 0; glowLayer < 3; glowLayer++) {
+      this.ctx.beginPath()
+      const glowRadius = size * (0.2 + glowLayer * 0.1)
+      const glowOpacity = intensity * (0.5 - glowLayer * 0.15)
+      this.ctx.arc(0, 0, glowRadius, 0, Math.PI * 2)
+
+      const glowHue = 180 + (freqValue / 255) * 180 + glowLayer * 20
+      const glowGradient = this.ctx.createRadialGradient(0, 0, 0, 0, 0, glowRadius)
+      glowGradient.addColorStop(0, `hsla(${glowHue}, 100%, 95%, ${glowOpacity})`)
+      glowGradient.addColorStop(0.6, `hsla(${glowHue + 20}, 90%, 80%, ${glowOpacity * 0.6})`)
+      glowGradient.addColorStop(1, `hsla(${glowHue + 40}, 80%, 60%, 0)`)
+
+      this.ctx.fillStyle = glowGradient
+      this.ctx.fill()
+    }
 
     this.ctx.restore()
+  }
+
+  private calculateFaceNormal(face: any, vertices: any[]): { dot: number } {
+    // Simplified normal calculation for lighting
+    if (face.vertices.length < 3) return { dot: 0.5 }
+
+    const v1 = vertices[face.vertices[0]]
+    const v2 = vertices[face.vertices[1]]
+    const v3 = vertices[face.vertices[2]]
+
+    // Cross product to get normal (simplified 2D version)
+    const edge1x = v2.x - v1.x
+    const edge1y = v2.y - v1.y
+    const edge2x = v3.x - v1.x
+    const edge2y = v3.y - v1.y
+
+    // Simplified normal calculation
+    const normalZ = edge1x * edge2y - edge1y * edge2x
+    const lightDirection = { x: 1, y: -1, z: 1 } // Light from top-right-front
+
+    // Dot product with light direction (simplified)
+    const dot = Math.abs(normalZ) * 0.5 + 0.5
+    return { dot: Math.max(0.2, Math.min(1, dot)) }
   }
 
   private drawOpticalTunnels(centerX: number, centerY: number, audioAnalysis: { frequencyData: Uint8Array, amplitude: number, duration: number }, seed: number, maxRadius: number): void {
@@ -1973,29 +2120,103 @@ export class VisualizationRenderer {
 
       if (intensity < 0.4) continue
 
-      // Tunnel position with some offset from center
-      const tunnelX = centerX + Math.sin(seed + tunnel * 2) * maxRadius * 0.3
-      const tunnelY = centerY + Math.cos(seed + tunnel * 2.3) * maxRadius * 0.3
+      // Enhanced 3D tunnel with perspective
+      const tunnelX = centerX + Math.sin(seed + tunnel * 2) * maxRadius * 0.4
+      const tunnelY = centerY + Math.cos(seed + tunnel * 2.3) * maxRadius * 0.4
 
-      const rings = 20
-      const maxTunnelRadius = maxRadius * (0.3 + intensity * 0.4)
+      const rings = 25
+      const maxTunnelRadius = maxRadius * (0.4 + intensity * 0.5)
+      const tunnelDepth = maxRadius * 0.8 // Virtual depth
 
       this.ctx.globalCompositeOperation = 'screen'
 
+      // Create 3D spiral tunnel effect
       for (let ring = 0; ring < rings; ring++) {
         const ringProgress = ring / rings
-        const ringRadius = maxTunnelRadius * (1 - ringProgress) * (0.1 + ringProgress * 0.9)
-        const ringOpacity = intensity * (1 - ringProgress) * 0.6
+        const virtualZ = ringProgress * tunnelDepth
 
-        if (ringOpacity < 0.05) continue
+        // Perspective calculation
+        const perspective = 1 / (1 + virtualZ / tunnelDepth)
+        const ringRadius = maxTunnelRadius * perspective * (0.1 + ringProgress * 0.9)
 
-        const hue = 160 + tunnel * 40 + ring * 8 + (freqValue / 255) * 80
-        this.ctx.strokeStyle = `hsla(${hue}, 90%, 70%, ${ringOpacity})`
-        this.ctx.lineWidth = 2 + intensity * 4 * (1 - ringProgress)
+        // Depth-based opacity and brightness
+        const depthFactor = 1 - ringProgress * 0.7
+        const ringOpacity = intensity * depthFactor * 0.8
+        const brightness = 60 + depthFactor * 30
 
-        this.ctx.beginPath()
-        this.ctx.arc(tunnelX, tunnelY, ringRadius, 0, Math.PI * 2)
-        this.ctx.stroke()
+        if (ringOpacity < 0.03) continue
+
+        // 3D lighting effect based on depth
+        const lightIntensity = Math.max(0.3, 1 - ringProgress * 0.6)
+        const shadowIntensity = ringProgress * 0.4
+
+        // Create multiple ring segments for 3D effect
+        const segments = 8 + Math.floor(intensity * 8)
+        for (let segment = 0; segment < segments; segment++) {
+          const segmentAngle = (segment / segments) * Math.PI * 2
+          const nextSegmentAngle = ((segment + 1) / segments) * Math.PI * 2
+
+          // Add slight spiral rotation based on depth
+          const spiralRotation = ringProgress * Math.PI * 0.5 + tunnel * Math.PI * 0.3
+          const startAngle = segmentAngle + spiralRotation
+          const endAngle = nextSegmentAngle + spiralRotation
+
+          // Calculate segment position with perspective distortion
+          const segmentX = tunnelX + Math.cos(startAngle) * ringRadius
+          const segmentY = tunnelY + Math.sin(startAngle) * ringRadius
+          const nextSegmentX = tunnelX + Math.cos(endAngle) * ringRadius
+          const nextSegmentY = tunnelY + Math.sin(endAngle) * ringRadius
+
+          // Create 3D arc segment
+          this.ctx.beginPath()
+          this.ctx.arc(tunnelX, tunnelY, ringRadius, startAngle, endAngle)
+
+          const hue = 160 + tunnel * 40 + ring * 6 + segment * 2 + (freqValue / 255) * 100
+          const saturation = 90 + lightIntensity * 10
+          const lightness = brightness + lightIntensity * 20
+          const alpha = ringOpacity * (0.7 + lightIntensity * 0.3)
+
+          this.ctx.strokeStyle = `hsla(${hue}, ${saturation}%, ${lightness}%, ${alpha})`
+          this.ctx.lineWidth = (2 + intensity * 6) * perspective * (0.5 + lightIntensity * 1.5)
+          this.ctx.stroke()
+
+          // Add inner glow for depth
+          if (segment % 2 === 0) {
+            this.ctx.beginPath()
+            this.ctx.arc(tunnelX, tunnelY, ringRadius * 0.8, startAngle, endAngle)
+            this.ctx.strokeStyle = `hsla(${hue + 40}, 100%, ${Math.min(95, lightness + 25)}%, ${alpha * 0.4})`
+            this.ctx.lineWidth = 1 * perspective
+            this.ctx.stroke()
+          }
+        }
+
+        // Add connecting lines between rings for grid effect
+        if (ring > 0 && ring % 3 === 0) {
+          const prevRingProgress = (ring - 3) / rings
+          const prevVirtualZ = prevRingProgress * tunnelDepth
+          const prevPerspective = 1 / (1 + prevVirtualZ / tunnelDepth)
+          const prevRingRadius = maxTunnelRadius * prevPerspective * (0.1 + prevRingProgress * 0.9)
+
+          const connectionSegments = 6
+          for (let conn = 0; conn < connectionSegments; conn++) {
+            const connectionAngle = (conn / connectionSegments) * Math.PI * 2 + tunnel * Math.PI * 0.2
+
+            const startX = tunnelX + Math.cos(connectionAngle) * prevRingRadius
+            const startY = tunnelY + Math.sin(connectionAngle) * prevRingRadius
+            const endX = tunnelX + Math.cos(connectionAngle) * ringRadius
+            const endY = tunnelY + Math.sin(connectionAngle) * ringRadius
+
+            this.ctx.beginPath()
+            this.ctx.moveTo(startX, startY)
+            this.ctx.lineTo(endX, endY)
+
+            const connectionHue = 140 + tunnel * 50 + conn * 10
+            const connectionAlpha = ringOpacity * 0.6
+            this.ctx.strokeStyle = `hsla(${connectionHue}, 85%, 65%, ${connectionAlpha})`
+            this.ctx.lineWidth = 1 + intensity * 2
+            this.ctx.stroke()
+          }
+        }
       }
 
       this.ctx.globalCompositeOperation = 'source-over'
