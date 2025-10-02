@@ -65,7 +65,7 @@ export default function CreatePage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [uploadProgress, setUploadProgress] = useState(0)
-  const [selectedStyle, setSelectedStyle] = useState<VisualizationStyle['id']>('mandala')
+  const [selectedStyle, setSelectedStyle] = useState<VisualizationStyle['id']>('particles')
   const [styleConfig, setStyleConfig] = useState<StyleConfig>({
     sensitivity: 1,
     smoothing: 0.8,
@@ -543,8 +543,11 @@ export default function CreatePage() {
                   <div className="flex items-center justify-between">
                     <span className="text-[var(--color-primary-text-secondary)]">시각화 스타일:</span>
                     <span className="text-[var(--color-primary-text-primary)] font-medium">
-                      {selectedStyle === 'mandala' ? '만다라' :
-                       selectedStyle === 'inkflow' ? '잉크플로우' : '네온그리드'}
+                      {selectedStyle === 'spectrum-3d' ? 'Spectrum 3D' :
+                       selectedStyle === 'particles' ? 'Fluid Particles' :
+                       selectedStyle === 'spectrogram-art' ? 'Spectrogram Art' :
+                       selectedStyle === 'cozy-abstract' ? 'Cozy Abstract' :
+                       selectedStyle === 'ml-emotion' ? 'ML Emotion' : selectedStyle}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">

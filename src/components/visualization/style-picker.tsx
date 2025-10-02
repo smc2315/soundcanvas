@@ -4,12 +4,13 @@ import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import {
   CircleDot,
-  Droplets,
-  Grid3X3,
+  Zap,
+  Palette as PaletteIcon,
+  Brain,
+  Box,
   Play,
   Pause,
   Settings,
-  Palette,
   Sliders
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -19,7 +20,7 @@ import { cn } from '@/lib/utils'
 
 // Types
 export interface VisualizationStyle {
-  id: 'mandala' | 'inkflow' | 'neongrid'
+  id: 'spectrum-3d' | 'particles' | 'spectrogram-art' | 'cozy-abstract' | 'ml-emotion'
   name: string
   description: string
   icon: React.ComponentType<{ size?: number; className?: string }>
@@ -27,6 +28,8 @@ export interface VisualizationStyle {
   features: string[]
   complexity: 'low' | 'medium' | 'high'
   performance: 'good' | 'medium' | 'intensive'
+  category: 'data' | 'artistic' | 'abstract'
+  supports3D: boolean
 }
 
 export interface StyleConfig {
@@ -52,34 +55,64 @@ export interface StylePickerProps {
 // Style definitions
 const visualizationStyles: VisualizationStyle[] = [
   {
-    id: 'mandala',
-    name: '만다라',
-    description: '대칭적인 원형 패턴으로 주파수별 반응을 아름다운 기하학적 형태로 표현합니다.',
-    icon: CircleDot,
-    colors: ['#00F5FF', '#9D4EDD', '#FF6EC7'],
-    features: ['8중 대칭', '주파수 분할', '회전 애니메이션', '중심 집중'],
-    complexity: 'medium',
-    performance: 'good'
-  },
-  {
-    id: 'inkflow',
-    name: '잉크플로우',
-    description: '유체역학을 바탕으로 한 유기적 파티클 시스템으로 자연스러운 흐름을 생성합니다.',
-    icon: Droplets,
-    colors: ['#9D4EDD', '#FF6EC7', '#00F5FF'],
-    features: ['파티클 시스템', '점성 효과', '유기적 움직임', '색상 혼합'],
+    id: 'spectrum-3d',
+    name: 'Spectrum 3D',
+    description: 'Three.js 기반 3D 주파수 스펙트럼 지형으로 입체적인 오디오 시각화를 제공합니다.',
+    icon: Box,
+    colors: ['#003f5c', '#2f4b7c', '#665191', '#a05195', '#d45087'],
+    features: ['3D 지형', '실시간 높이맵', '카메라 회전', '파티클 시스템'],
     complexity: 'high',
-    performance: 'intensive'
+    performance: 'intensive',
+    category: 'data',
+    supports3D: true
   },
   {
-    id: 'neongrid',
-    name: '네온그리드',
-    description: '미래지향적인 기하학 그리드 패턴으로 맥동하는 네온 효과를 구현합니다.',
-    icon: Grid3X3,
-    colors: ['#FF6EC7', '#00F5FF', '#39FF14'],
-    features: ['그리드 토폴로지', '글로우 이펙트', '노드 맥동', '에너지 전파'],
+    id: 'particles',
+    name: 'Fluid Particles',
+    description: '유체 역학 파티클 시스템으로 부드러운 빛 효과와 유기적 흐름을 생성합니다.',
+    icon: CircleDot,
+    colors: ['#FF6B6B', '#FFE66D', '#FF8E53', '#C44569', '#F8B500'],
+    features: ['유체 파티클', '소프트 블렌딩', '트레일 효과', '온셋 반응'],
     complexity: 'medium',
-    performance: 'medium'
+    performance: 'good',
+    category: 'artistic',
+    supports3D: false
+  },
+  {
+    id: 'spectrogram-art',
+    name: 'Spectrogram Art',
+    description: '예술적 스펙트로그램으로 수채화, 유화 등 다양한 페인팅 스타일을 지원합니다.',
+    icon: PaletteIcon,
+    colors: ['#2E1065', '#7C3AED', '#A855F7', '#EC4899', '#F97316'],
+    features: ['페인팅 효과', '시간축 표시', '주파수 매핑', '텍스처 혼합'],
+    complexity: 'medium',
+    performance: 'medium',
+    category: 'artistic',
+    supports3D: false
+  },
+  {
+    id: 'cozy-abstract',
+    name: 'Cozy Abstract',
+    description: '따뜻하고 편안한 추상 패턴으로 부드러운 조명과 유기적 움직임을 구현합니다.',
+    icon: Zap,
+    colors: ['#8B4513', '#CD853F', '#DEB887', '#F4A460', '#FFE4B5'],
+    features: ['유기적 형태', '앰비언트 글로우', '종이 텍스처', '호흡 애니메이션'],
+    complexity: 'low',
+    performance: 'good',
+    category: 'abstract',
+    supports3D: false
+  },
+  {
+    id: 'ml-emotion',
+    name: 'ML Emotion',
+    description: 'AI 감정 분석을 통한 신경망 패턴으로 적응형 시각화를 제공합니다.',
+    icon: Brain,
+    colors: ['#1a1a2e', '#16213e', '#0f3460', '#533483', '#7209b7'],
+    features: ['감정 분석', '신경망 연결', '적응형 색상', '데이터 오버레이'],
+    complexity: 'high',
+    performance: 'medium',
+    category: 'data',
+    supports3D: false
   }
 ]
 
@@ -119,6 +152,7 @@ export function StylePicker({
   })
 
   const [activeTab, setActiveTab] = useState<'styles' | 'settings'>('styles')
+  const [selectedCategory, setSelectedCategory] = useState<'all' | 'data' | 'artistic' | 'abstract'>('all')
 
   // Handle config changes
   const handleConfigChange = (key: keyof StyleConfig, value: any) => {
@@ -151,6 +185,11 @@ export function StylePicker({
     ))
   }
 
+  // Filter styles by category
+  const filteredStyles = selectedCategory === 'all'
+    ? visualizationStyles
+    : visualizationStyles.filter(style => style.category === selectedCategory)
+
   return (
     <div className={cn('w-full max-w-4xl mx-auto', className)}>
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)} className="w-full">
@@ -168,13 +207,33 @@ export function StylePicker({
 
         {/* Styles Tab */}
         <TabsContent value="styles" className="space-y-6">
+          {/* Category Filter */}
+          <div className="flex flex-wrap gap-2 justify-center mb-6">
+            {[
+              { id: 'all', label: '전체', count: visualizationStyles.length },
+              { id: 'data', label: '데이터', count: visualizationStyles.filter(s => s.category === 'data').length },
+              { id: 'artistic', label: '아티스틱', count: visualizationStyles.filter(s => s.category === 'artistic').length },
+              { id: 'abstract', label: '추상', count: visualizationStyles.filter(s => s.category === 'abstract').length }
+            ].map((category) => (
+              <Button
+                key={category.id}
+                variant={selectedCategory === category.id ? 'primary' : 'outline'}
+                size="sm"
+                onClick={() => setSelectedCategory(category.id as any)}
+                className="text-sm"
+              >
+                {category.label} ({category.count})
+              </Button>
+            ))}
+          </div>
+
           <motion.div
             initial="hidden"
             animate="visible"
             variants={containerVariants}
-            className="grid grid-cols-1 md:grid-cols-3 gap-6"
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
           >
-            {visualizationStyles.map((style) => (
+            {filteredStyles.map((style) => (
               <motion.div key={style.id} variants={cardVariants}>
                 <Card
                   className={cn(
@@ -237,18 +296,34 @@ export function StylePicker({
                     </div>
 
                     {/* Performance Indicators */}
-                    <div className="flex items-center justify-between pt-3 border-t border-[var(--color-primary-border-default)]">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-[var(--color-primary-text-tertiary)]">복잡도:</span>
-                        <div className="flex gap-1">
-                          {getComplexityDots(style.complexity)}
+                    <div className="space-y-2 pt-3 border-t border-[var(--color-primary-border-default)]">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-[var(--color-primary-text-tertiary)]">복잡도:</span>
+                          <div className="flex gap-1">
+                            {getComplexityDots(style.complexity)}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-[var(--color-primary-text-tertiary)]">성능:</span>
+                          <span className={cn('text-xs font-medium', getPerformanceColor(style.performance))}>
+                            {style.performance === 'good' ? '좋음' : style.performance === 'medium' ? '보통' : '집약적'}
+                          </span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-[var(--color-primary-text-tertiary)]">성능:</span>
-                        <span className={cn('text-xs font-medium', getPerformanceColor(style.performance))}>
-                          {style.performance === 'good' ? '좋음' : style.performance === 'medium' ? '보통' : '집약적'}
-                        </span>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-[var(--color-primary-text-tertiary)]">카테고리:</span>
+                          <span className="text-xs font-medium text-[var(--color-accent-neon-purple)]">
+                            {style.category === 'data' ? '데이터' : style.category === 'artistic' ? '아티스틱' : '추상'}
+                          </span>
+                        </div>
+                        {style.supports3D && (
+                          <div className="flex items-center gap-1">
+                            <Box size={12} className="text-[var(--color-accent-neon-blue)]" />
+                            <span className="text-xs font-medium text-[var(--color-accent-neon-blue)]">3D</span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
