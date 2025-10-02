@@ -55,8 +55,20 @@ export class RealtimeAudioAnalyser {
   ) {
     this.audioContext = audioContext
 
-    // Create and configure analyser
-    this.analyserNode = audioContext.createAnalyser()
+    // Create and configure analyser with proper browser compatibility
+    try {
+      // Try standard method first
+      this.analyserNode = audioContext.createAnalyser()
+    } catch (e) {
+      // Fallback for older browsers or different implementations
+      this.analyserNode = (audioContext as any).createAnalyzer?.() ||
+                          (audioContext as any).createAnalyserNode?.()
+
+      if (!this.analyserNode) {
+        throw new Error('AnalyserNode not supported in this browser')
+      }
+    }
+
     this.analyserNode.fftSize = fftSize
     this.analyserNode.smoothingTimeConstant = smoothingTimeConstant
 

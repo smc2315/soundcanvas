@@ -165,6 +165,82 @@ export class SeededRNG {
   }
 
   /**
+   * Generate 3D Perlin-like noise value at coordinates
+   */
+  noise3D(x: number, y: number, z: number, scale: number = 1): number {
+    const scaledX = x * scale
+    const scaledY = y * scale
+    const scaledZ = z * scale
+
+    const intX = Math.floor(scaledX)
+    const intY = Math.floor(scaledY)
+    const intZ = Math.floor(scaledZ)
+    const fracX = scaledX - intX
+    const fracY = scaledY - intY
+    const fracZ = scaledZ - intZ
+
+    // Get pseudo-random gradients at 8 corners of the cube
+    const gradients = [
+      this.gradientAt3D(intX, intY, intZ),
+      this.gradientAt3D(intX + 1, intY, intZ),
+      this.gradientAt3D(intX, intY + 1, intZ),
+      this.gradientAt3D(intX + 1, intY + 1, intZ),
+      this.gradientAt3D(intX, intY, intZ + 1),
+      this.gradientAt3D(intX + 1, intY, intZ + 1),
+      this.gradientAt3D(intX, intY + 1, intZ + 1),
+      this.gradientAt3D(intX + 1, intY + 1, intZ + 1)
+    ]
+
+    // Calculate dot products with distance vectors
+    const dots = [
+      gradients[0].x * fracX + gradients[0].y * fracY + gradients[0].z * fracZ,
+      gradients[1].x * (fracX - 1) + gradients[1].y * fracY + gradients[1].z * fracZ,
+      gradients[2].x * fracX + gradients[2].y * (fracY - 1) + gradients[2].z * fracZ,
+      gradients[3].x * (fracX - 1) + gradients[3].y * (fracY - 1) + gradients[3].z * fracZ,
+      gradients[4].x * fracX + gradients[4].y * fracY + gradients[4].z * (fracZ - 1),
+      gradients[5].x * (fracX - 1) + gradients[5].y * fracY + gradients[5].z * (fracZ - 1),
+      gradients[6].x * fracX + gradients[6].y * (fracY - 1) + gradients[6].z * (fracZ - 1),
+      gradients[7].x * (fracX - 1) + gradients[7].y * (fracY - 1) + gradients[7].z * (fracZ - 1)
+    ]
+
+    // Interpolate
+    const u = this.fade(fracX)
+    const v = this.fade(fracY)
+    const w = this.fade(fracZ)
+
+    // Trilinear interpolation
+    const x1 = this.lerp(dots[0], dots[1], u)
+    const x2 = this.lerp(dots[2], dots[3], u)
+    const x3 = this.lerp(dots[4], dots[5], u)
+    const x4 = this.lerp(dots[6], dots[7], u)
+
+    const y1 = this.lerp(x1, x2, v)
+    const y2 = this.lerp(x3, x4, v)
+
+    return this.lerp(y1, y2, w)
+  }
+
+  private gradientAt3D(x: number, y: number, z: number): { x: number, y: number, z: number } {
+    // Generate deterministic gradient vector from 3D coordinates
+    const hash = this.hashCoords3D(x, y, z)
+    const h = hash % 12
+
+    // Use hash to select one of 12 gradient directions
+    const gradients = [
+      { x: 1, y: 1, z: 0 }, { x: -1, y: 1, z: 0 }, { x: 1, y: -1, z: 0 }, { x: -1, y: -1, z: 0 },
+      { x: 1, y: 0, z: 1 }, { x: -1, y: 0, z: 1 }, { x: 1, y: 0, z: -1 }, { x: -1, y: 0, z: -1 },
+      { x: 0, y: 1, z: 1 }, { x: 0, y: -1, z: 1 }, { x: 0, y: 1, z: -1 }, { x: 0, y: -1, z: -1 }
+    ]
+
+    return gradients[h]
+  }
+
+  private hashCoords3D(x: number, y: number, z: number): number {
+    // Simple hash function for 3D coordinates
+    return ((x * 374761393) + (y * 668265263) + (z * 1274126177)) % 2147483647
+  }
+
+  /**
    * Generate fractal noise (multiple octaves)
    */
   fractalNoise2D(x: number, y: number, octaves: number = 4, persistence: number = 0.5, scale: number = 1): number {
@@ -174,6 +250,23 @@ export class SeededRNG {
 
     for (let i = 0; i < octaves; i++) {
       value += this.noise2D(x, y, frequency) * amplitude
+      amplitude *= persistence
+      frequency *= 2
+    }
+
+    return value
+  }
+
+  /**
+   * Generate 3D fractal noise (multiple octaves)
+   */
+  fractalNoise3D(x: number, y: number, z: number, octaves: number = 4, persistence: number = 0.5, scale: number = 1): number {
+    let value = 0
+    let amplitude = 1
+    let frequency = scale
+
+    for (let i = 0; i < octaves; i++) {
+      value += this.noise3D(x, y, z, frequency) * amplitude
       amplitude *= persistence
       frequency *= 2
     }

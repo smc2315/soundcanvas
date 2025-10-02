@@ -22,7 +22,10 @@ const VISUALIZATION_MODES = [
   () => import('./modes/mode-particles'),
   () => import('./modes/mode-spectrogram-art'),
   () => import('./modes/mode-cozy-abstract'),
-  () => import('./modes/mode-ml-emotion')
+  () => import('./modes/mode-ml-emotion'),
+  () => import('./modes/mode-irisgram'),
+  () => import('./modes/mode-lissajous'),
+  () => import('./modes/mode-particula')
 ]
 
 export interface VisualizationEngineConfig {
@@ -169,13 +172,22 @@ export class VisualizationEngine {
   async initialize(): Promise<void> {
     await this.registry.initialize()
 
-    // Initialize audio analysers
-    this.audioAnalyser = new RealtimeAudioAnalyser({
-      fftSize: this.config.fftSize,
-      smoothingTimeConstant: this.config.smoothingTimeConstant,
-      minDecibels: this.config.minDecibels,
-      maxDecibels: this.config.maxDecibels
-    })
+    // Create AudioContext first
+    let audioContext: AudioContext
+    try {
+      // Try standard AudioContext
+      audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+    } catch (error) {
+      console.error('Failed to create AudioContext:', error)
+      throw new Error('Web Audio API not supported in this browser')
+    }
+
+    // Initialize audio analysers with AudioContext
+    this.audioAnalyser = new RealtimeAudioAnalyser(
+      audioContext,
+      this.config.fftSize,
+      this.config.smoothingTimeConstant
+    )
 
     if (this.config.enableOfflineMode) {
       this.offlineAnalyser = new OfflineAudioAnalyser({

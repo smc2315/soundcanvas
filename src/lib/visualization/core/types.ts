@@ -197,6 +197,10 @@ export interface Visualizer {
   startPreview(): void
   stopPreview(): void
 
+  // Canvas access
+  getCanvas(): HTMLCanvasElement | OffscreenCanvas
+  getContext(): CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D
+
   // Events
   on(event: string, callback: Function): void
   off(event: string, callback: Function): void
@@ -235,15 +239,16 @@ export abstract class BaseVisualizer implements Visualizer {
     this.canvas = target
     this.config = config
 
+    // Set canvas size first
+    this.canvas.width = config.width * config.pixelRatio
+    this.canvas.height = config.height * config.pixelRatio
+
+    // Create 2D context for output (3D visualizations will render to this)
     const ctx = this.canvas.getContext('2d')
     if (!ctx) {
       throw new Error('Failed to get 2D rendering context')
     }
     this.ctx = ctx
-
-    // Set canvas size
-    this.canvas.width = config.width * config.pixelRatio
-    this.canvas.height = config.height * config.pixelRatio
     this.ctx.scale(config.pixelRatio, config.pixelRatio)
 
     // Initialize with default parameters
@@ -381,6 +386,14 @@ export abstract class BaseVisualizer implements Visualizer {
 
   stopPreview(): void {
     this.emit('previewStop')
+  }
+
+  getCanvas(): HTMLCanvasElement | OffscreenCanvas {
+    return this.canvas
+  }
+
+  getContext(): CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D {
+    return this.ctx
   }
 
   on(event: string, callback: Function): void {

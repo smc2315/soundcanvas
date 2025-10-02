@@ -11,7 +11,10 @@ import {
   Play,
   Pause,
   Settings,
-  Sliders
+  Sliders,
+  Eye,
+  Radio,
+  Sparkles
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -20,7 +23,7 @@ import { cn } from '@/lib/utils'
 
 // Types
 export interface VisualizationStyle {
-  id: 'spectrum-3d' | 'particles' | 'spectrogram-art' | 'cozy-abstract' | 'ml-emotion'
+  id: 'spectrum-3d' | 'particles' | 'spectrogram-art' | 'cozy-abstract' | 'ml-emotion' | 'irisgram' | 'lissajous' | 'particula'
   name: string
   description: string
   icon: React.ComponentType<{ size?: number; className?: string }>
@@ -28,7 +31,7 @@ export interface VisualizationStyle {
   features: string[]
   complexity: 'low' | 'medium' | 'high'
   performance: 'good' | 'medium' | 'intensive'
-  category: 'data' | 'artistic' | 'abstract'
+  category: 'data' | 'artistic' | 'abstract' | 'experimental'
   supports3D: boolean
 }
 
@@ -113,6 +116,42 @@ const visualizationStyles: VisualizationStyle[] = [
     performance: 'medium',
     category: 'data',
     supports3D: false
+  },
+  {
+    id: 'irisgram',
+    name: 'Irisgram',
+    description: '극좌표 스펙트로그램으로 홍채처럼 아름다운 원형 패턴을 생성합니다.',
+    icon: Eye,
+    colors: ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FECA57', '#FF9FF3'],
+    features: ['극좌표 변환', '홍채 패턴', '원형 시각화', '유기적 변형'],
+    complexity: 'high',
+    performance: 'good',
+    category: 'artistic',
+    supports3D: false
+  },
+  {
+    id: 'lissajous',
+    name: 'Lissajous',
+    description: '오실로스코프 스타일의 리사주 곡선으로 수학적이고 우아한 패턴을 만듭니다.',
+    icon: Radio,
+    colors: ['#00FF41', '#00CC33', '#009926', '#39FF14', '#32CD32'],
+    features: ['리사주 곡선', '오실로스코프', '수학적 패턴', '주파수 매핑'],
+    complexity: 'medium',
+    performance: 'good',
+    category: 'data',
+    supports3D: false
+  },
+  {
+    id: 'particula',
+    name: 'Particula',
+    description: '물리 시뮬레이션 기반의 고급 파티클 시스템으로 생동감 넘치는 시각화를 구현합니다.',
+    icon: Sparkles,
+    colors: ['#FF006E', '#FB5607', '#FFBE0B', '#8338EC', '#3A86FF', '#06FFA5'],
+    features: ['물리 시뮬레이션', '군집 행동', '파티클 연결', '퀀텀 효과'],
+    complexity: 'high',
+    performance: 'medium',
+    category: 'experimental',
+    supports3D: false
   }
 ]
 
@@ -152,7 +191,7 @@ export function StylePicker({
   })
 
   const [activeTab, setActiveTab] = useState<'styles' | 'settings'>('styles')
-  const [selectedCategory, setSelectedCategory] = useState<'all' | 'data' | 'artistic' | 'abstract'>('all')
+  const [selectedCategory, setSelectedCategory] = useState<'all' | 'data' | 'artistic' | 'abstract' | 'experimental'>('all')
 
   // Handle config changes
   const handleConfigChange = (key: keyof StyleConfig, value: any) => {
@@ -213,7 +252,8 @@ export function StylePicker({
               { id: 'all', label: '전체', count: visualizationStyles.length },
               { id: 'data', label: '데이터', count: visualizationStyles.filter(s => s.category === 'data').length },
               { id: 'artistic', label: '아티스틱', count: visualizationStyles.filter(s => s.category === 'artistic').length },
-              { id: 'abstract', label: '추상', count: visualizationStyles.filter(s => s.category === 'abstract').length }
+              { id: 'abstract', label: '추상', count: visualizationStyles.filter(s => s.category === 'abstract').length },
+              { id: 'experimental', label: '실험적', count: visualizationStyles.filter(s => s.category === 'experimental').length }
             ].map((category) => (
               <Button
                 key={category.id}
@@ -315,7 +355,9 @@ export function StylePicker({
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-[var(--color-primary-text-tertiary)]">카테고리:</span>
                           <span className="text-xs font-medium text-[var(--color-accent-neon-purple)]">
-                            {style.category === 'data' ? '데이터' : style.category === 'artistic' ? '아티스틱' : '추상'}
+                            {style.category === 'data' ? '데이터' :
+                             style.category === 'artistic' ? '아티스틱' :
+                             style.category === 'abstract' ? '추상' : '실험적'}
                           </span>
                         </div>
                         {style.supports3D && (

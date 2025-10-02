@@ -147,6 +147,7 @@ export class Spectrum3DVisualizer extends BaseVisualizer {
   private scene: THREE.Scene
   private camera: THREE.PerspectiveCamera
   private renderer: THREE.WebGLRenderer
+  private webglCanvas: HTMLCanvasElement
   private terrain: THREE.Mesh
   private terrainGeometry: THREE.PlaneGeometry
   private terrainMaterial: THREE.ShaderMaterial
@@ -192,9 +193,14 @@ export class Spectrum3DVisualizer extends BaseVisualizer {
       1000
     )
 
-    // Create renderer
+    // Create a separate WebGL canvas to avoid context conflicts
+    const webglCanvas = document.createElement('canvas')
+    webglCanvas.width = this.config.width * this.config.pixelRatio
+    webglCanvas.height = this.config.height * this.config.pixelRatio
+
+    // Create renderer with separate canvas
     this.renderer = new THREE.WebGLRenderer({
-      canvas: this.canvas as HTMLCanvasElement,
+      canvas: webglCanvas,
       antialias: true,
       alpha: false
     })
@@ -203,6 +209,9 @@ export class Spectrum3DVisualizer extends BaseVisualizer {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
     this.renderer.toneMappingExposure = 1.0
+
+    // Store WebGL canvas reference
+    this.webglCanvas = webglCanvas
 
     // Add fog
     this.scene.fog = new THREE.Fog(0x000510, 50, 500)
@@ -332,8 +341,14 @@ export class Spectrum3DVisualizer extends BaseVisualizer {
     // Update shader uniforms
     this.updateShaderUniforms(params)
 
-    // Render the scene
+    // Render the scene to WebGL canvas
     this.renderer.render(this.scene, this.camera)
+
+    // Copy WebGL canvas to main canvas
+    if (this.ctx && this.webglCanvas) {
+      this.ctx.clearRect(0, 0, this.config.width, this.config.height)
+      this.ctx.drawImage(this.webglCanvas, 0, 0, this.config.width, this.config.height)
+    }
   }
 
   private smoothFrequencyData(): void {
@@ -442,24 +457,76 @@ export class Spectrum3DVisualizer extends BaseVisualizer {
       varying vec3 vNormal;
       varying vec2 vUv;
       varying float vAudioValue;
+      varying float vDisplacement;
+      varying vec3 vWorldPosition;
+
+      // Noise function for organic terrain
+      float noise(vec3 pos) {
+        return fract(sin(dot(pos, vec3(12.9898, 78.233, 45.543))) * 43758.5453);
+      }
+
+      float fbm(vec3 pos) {
+        float value = 0.0;
+        float amplitude = 0.5;
+        float frequency = 1.0;
+
+        for(int i = 0; i < 4; i++) {
+          value += amplitude * noise(pos * frequency);
+          amplitude *= 0.5;
+          frequency *= 2.0;
+        }
+        return value;
+      }
 
       void main() {
         vUv = uv;
         vPosition = position;
 
-        // Sample audio data
+        // Sample audio data with smoothing
         float audioValue = texture2D(audioData, vec2(uv.x, 0.0)).r;
-        vAudioValue = audioValue;
+        float audioSmooth = mix(
+          texture2D(audioData, vec2(max(0.0, uv.x - 0.01), 0.0)).r,
+          mix(audioValue, texture2D(audioData, vec2(min(1.0, uv.x + 0.01), 0.0)).r, 0.5),
+          0.5
+        );
+        vAudioValue = audioSmooth;
 
-        // Apply height displacement
+        // Apply height displacement with audio
         vec3 newPosition = position;
-        newPosition.y += audioValue * heightScale;
+        float displacement = audioSmooth * heightScale;
 
-        // Add some wave motion
-        newPosition.y += sin(position.x * 0.1 + time * 0.5) * 2.0;
-        newPosition.y += cos(position.z * 0.1 + time * 0.3) * 1.0;
+        // Add fractal noise for organic terrain
+        float organicNoise = fbm(vec3(position.x * 0.02, position.z * 0.02, time * 0.1));
+        displacement += organicNoise * 8.0;
 
-        vNormal = normal;
+        // Add wave motion with audio-reactive amplitude
+        float waveAmplitude = 2.0 + audioSmooth * 5.0;
+        displacement += sin(position.x * 0.1 + time * 0.5) * waveAmplitude;
+        displacement += cos(position.z * 0.1 + time * 0.3) * waveAmplitude * 0.5;
+
+        // Add ripple effects
+        float centerDist = length(position.xz);
+        displacement += sin(centerDist * 0.05 - time * 2.0) * audioSmooth * 3.0;
+
+        newPosition.y += displacement;
+        vDisplacement = displacement;
+        vWorldPosition = (modelMatrix * vec4(newPosition, 1.0)).xyz;
+
+        // Calculate enhanced normal for better lighting
+        float epsilon = 2.0;
+        vec3 tangentX = vec3(epsilon, 0.0, 0.0);
+        vec3 tangentZ = vec3(0.0, 0.0, epsilon);
+
+        float heightL = texture2D(audioData, vec2(max(0.0, uv.x - 0.01), 0.0)).r * heightScale;
+        float heightR = texture2D(audioData, vec2(min(1.0, uv.x + 0.01), 0.0)).r * heightScale;
+        float heightD = audioSmooth * heightScale;
+        float heightU = audioSmooth * heightScale;
+
+        tangentX.y = heightR - heightL;
+        tangentZ.y = heightU - heightD;
+
+        vNormal = normalize(cross(tangentX, tangentZ));
+
         gl_Position = projectionMatrix * modelViewMatrix * vec4(newPosition, 1.0);
       }
     `
@@ -475,24 +542,103 @@ export class Spectrum3DVisualizer extends BaseVisualizer {
       varying vec3 vNormal;
       varying vec2 vUv;
       varying float vAudioValue;
+      varying float vDisplacement;
+      varying vec3 vWorldPosition;
+
+      // Enhanced noise functions
+      float hash(vec2 p) {
+        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+      }
+
+      float noise2D(vec2 p) {
+        vec2 i = floor(p);
+        vec2 f = fract(p);
+        vec2 u = f * f * (3.0 - 2.0 * f);
+
+        return mix(
+          mix(hash(i + vec2(0.0, 0.0)), hash(i + vec2(1.0, 0.0)), u.x),
+          mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x),
+          u.y
+        );
+      }
+
+      vec3 getEnhancedColor(float audioValue, vec3 worldPos) {
+        // Multi-layer color sampling
+        vec3 baseColor = texture2D(palette, vec2(audioValue, 0.0)).rgb;
+        vec3 detailColor = texture2D(palette, vec2(audioValue * 0.5 + 0.25, 0.0)).rgb;
+
+        // Frequency-based color modulation
+        float freqMod = sin(audioValue * 10.0 + time) * 0.5 + 0.5;
+        vec3 color = mix(baseColor, detailColor, freqMod * 0.3);
+
+        // Add iridescent effect based on viewing angle
+        vec3 viewDir = normalize(cameraPosition - worldPos);
+        float fresnel = pow(1.0 - abs(dot(viewDir, vNormal)), 2.0);
+        color += fresnel * vec3(0.3, 0.6, 1.0) * audioValue;
+
+        return color;
+      }
 
       void main() {
-        // Sample color from palette based on audio value
-        vec3 color = texture2D(palette, vec2(vAudioValue, 0.0)).rgb;
+        // Enhanced color calculation
+        vec3 color = getEnhancedColor(vAudioValue, vWorldPosition);
 
-        // Add some shimmer effect
-        float shimmer = sin(vPosition.x * 0.05 + time) * 0.1 + 0.9;
+        // Advanced shimmer with audio reactivity
+        float shimmerFreq = 0.05 + vAudioValue * 0.1;
+        float shimmer = sin(vPosition.x * shimmerFreq + time * 2.0) *
+                       cos(vPosition.z * shimmerFreq * 0.7 + time * 1.5) * 0.15 + 0.85;
         color *= shimmer;
 
-        // Apply lighting
-        vec3 lightDirection = normalize(vec3(1.0, 1.0, 1.0));
-        float lighting = dot(normalize(vNormal), lightDirection) * 0.5 + 0.5;
-        color *= lighting;
+        // Enhanced lighting with multiple light sources
+        vec3 lightDir1 = normalize(vec3(1.0, 1.0, 1.0));
+        vec3 lightDir2 = normalize(vec3(-0.5, 0.8, -0.2));
+        vec3 lightDir3 = normalize(vec3(0.0, -1.0, 0.5));
 
-        // Add energy-based glow
-        color += vAudioValue * vec3(0.2, 0.4, 0.8);
+        float lighting1 = max(0.0, dot(normalize(vNormal), lightDir1)) * 0.6;
+        float lighting2 = max(0.0, dot(normalize(vNormal), lightDir2)) * 0.3;
+        float lighting3 = max(0.0, dot(normalize(vNormal), lightDir3)) * 0.2;
 
-        gl_FragColor = vec4(color, 0.8);
+        float totalLighting = lighting1 + lighting2 + lighting3 + 0.3; // Ambient
+        color *= totalLighting;
+
+        // Specular highlights
+        vec3 viewDir = normalize(cameraPosition - vWorldPosition);
+        vec3 reflectDir = reflect(-lightDir1, normalize(vNormal));
+        float specular = pow(max(0.0, dot(viewDir, reflectDir)), 32.0);
+        color += specular * vec3(1.0, 1.0, 1.0) * vAudioValue * 0.5;
+
+        // Energy-based glow with color variation
+        vec3 glowColor = mix(
+          vec3(0.2, 0.4, 0.8),
+          vec3(0.8, 0.4, 0.2),
+          sin(time + vAudioValue * 5.0) * 0.5 + 0.5
+        );
+        color += vAudioValue * glowColor * 0.4;
+
+        // Height-based color mixing
+        float heightFactor = (vDisplacement + 20.0) / 40.0;
+        vec3 heightColor = mix(vec3(0.1, 0.2, 0.8), vec3(1.0, 0.8, 0.2), heightFactor);
+        color = mix(color, heightColor, 0.2);
+
+        // Atmospheric scattering effect
+        float distance = length(vWorldPosition - cameraPosition);
+        float scatter = exp(-distance * 0.01);
+        color = mix(vec3(0.1, 0.1, 0.2), color, scatter);
+
+        // Noise-based detail
+        float detailNoise = noise2D(vUv * 20.0 + time * 0.1);
+        color += (detailNoise - 0.5) * 0.05 * vAudioValue;
+
+        // Edge enhancement for wireframe mode
+        if (wireframe > 0.5) {
+          float edge = abs(fract(vUv.x * 100.0) - 0.5) + abs(fract(vUv.y * 100.0) - 0.5);
+          edge = smoothstep(0.4, 0.5, edge);
+          color = mix(color * 0.3, color, edge);
+        }
+
+        // Final alpha with audio reactivity
+        float alpha = 0.8 + vAudioValue * 0.2;
+        gl_FragColor = vec4(color, alpha);
       }
     `
   }
