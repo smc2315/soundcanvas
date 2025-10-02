@@ -94,38 +94,52 @@ export class VisualizationRenderer {
     const centerY = this.canvas.height / 2
     const maxRadius = Math.max(this.canvas.width, this.canvas.height) / 2
 
+    // Create more sophisticated gradient with multiple focal points
     const gradient = this.ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, maxRadius)
 
-    // Use audio characteristics to influence colors
-    const bassInfluence = this.calculateBandAverage(audioAnalysis.frequencyData, 0, 0.1) // Low frequencies
-    const midInfluence = this.calculateBandAverage(audioAnalysis.frequencyData, 0.1, 0.6) // Mid frequencies
-    const trebleInfluence = this.calculateBandAverage(audioAnalysis.frequencyData, 0.6, 1.0) // High frequencies
+    // Use audio characteristics to influence colors with richer palette
+    const bassInfluence = this.calculateBandAverage(audioAnalysis.frequencyData, 0, 0.1)
+    const midInfluence = this.calculateBandAverage(audioAnalysis.frequencyData, 0.1, 0.6)
+    const trebleInfluence = this.calculateBandAverage(audioAnalysis.frequencyData, 0.6, 1.0)
 
     switch (this.style) {
       case 'mandala':
-        // Colors influenced by frequency content
-        const warmth = Math.floor(bassInfluence * 20 + 15) // 15-35
-        const depth = Math.floor(midInfluence * 30 + 25) // 25-55
-        gradient.addColorStop(0, `rgba(${warmth}, 5, ${depth}, 0.95)`)
-        gradient.addColorStop(0.3, `rgba(${warmth + 10}, 15, ${depth + 10}, 0.9)`)
-        gradient.addColorStop(0.6, `rgba(${warmth + 20}, 25, ${depth + 20}, 0.85)`)
-        gradient.addColorStop(1, `rgba(5, 0, 15, 0.98)`)
+        // Rich, mystical colors with golden undertones
+        const goldHue = Math.floor(bassInfluence * 30 + 25) // Golden tones
+        const deepPurple = Math.floor(midInfluence * 40 + 20) // Deep purple
+        const warmRed = Math.floor(trebleInfluence * 25 + 15) // Warm red
+
+        gradient.addColorStop(0, `rgba(${goldHue + 10}, ${warmRed}, ${deepPurple * 0.3}, 0.98)`)
+        gradient.addColorStop(0.2, `rgba(${goldHue + 20}, ${warmRed + 5}, ${deepPurple * 0.5}, 0.95)`)
+        gradient.addColorStop(0.4, `rgba(${goldHue}, ${warmRed * 0.8}, ${deepPurple * 0.7}, 0.92)`)
+        gradient.addColorStop(0.7, `rgba(${goldHue * 0.6}, ${warmRed * 0.4}, ${deepPurple}, 0.88)`)
+        gradient.addColorStop(1, `rgba(8, 4, ${Math.floor(deepPurple * 0.8)}, 0.98)`)
         break
+
       case 'inkflow':
-        const blueShift = Math.floor(trebleInfluence * 15 + 10) // 10-25
-        const purpleShift = Math.floor(bassInfluence * 15 + 20) // 20-35
-        gradient.addColorStop(0, `rgba(${blueShift}, 5, ${purpleShift}, 0.95)`)
-        gradient.addColorStop(0.4, `rgba(${blueShift + 10}, 10, ${purpleShift + 10}, 0.9)`)
-        gradient.addColorStop(0.7, `rgba(15, ${blueShift + 10}, ${purpleShift + 15}, 0.85)`)
-        gradient.addColorStop(1, `rgba(5, 10, 25, 0.98)`)
+        // Ethereal blues and purples like aurora
+        const oceanBlue = Math.floor(trebleInfluence * 35 + 15)
+        const mysticalPurple = Math.floor(bassInfluence * 40 + 25)
+        const shimmerCyan = Math.floor(midInfluence * 25 + 10)
+
+        gradient.addColorStop(0, `rgba(${shimmerCyan}, ${oceanBlue}, ${mysticalPurple + 15}, 0.98)`)
+        gradient.addColorStop(0.25, `rgba(${shimmerCyan + 10}, ${oceanBlue + 10}, ${mysticalPurple + 20}, 0.94)`)
+        gradient.addColorStop(0.5, `rgba(${shimmerCyan + 5}, ${oceanBlue + 15}, ${mysticalPurple + 10}, 0.90)`)
+        gradient.addColorStop(0.75, `rgba(${shimmerCyan * 0.7}, ${oceanBlue + 5}, ${mysticalPurple}, 0.86)`)
+        gradient.addColorStop(1, `rgba(5, ${Math.floor(oceanBlue * 0.5)}, ${Math.floor(mysticalPurple * 0.8)}, 0.98)`)
         break
+
       case 'neongrid':
-        const cyan = Math.floor(midInfluence * 20 + 5) // 5-25
-        const electric = Math.floor(trebleInfluence * 10 + 15) // 15-25
-        gradient.addColorStop(0, `rgba(5, ${electric}, ${cyan}, 0.95)`)
-        gradient.addColorStop(0.3, `rgba(10, ${electric + 10}, ${cyan + 10}, 0.9)`)
-        gradient.addColorStop(0.6, `rgba(5, ${electric + 5}, ${cyan + 5}, 0.85)`)
-        gradient.addColorStop(1, `rgba(0, 10, 20, 0.98)`)
+        // Cyberpunk neon colors with electric feel
+        const neonCyan = Math.floor(midInfluence * 40 + 20)
+        const electricPink = Math.floor(trebleInfluence * 35 + 25)
+        const vividPurple = Math.floor(bassInfluence * 30 + 20)
+
+        gradient.addColorStop(0, `rgba(${electricPink * 0.3}, ${neonCyan}, ${vividPurple + 15}, 0.98)`)
+        gradient.addColorStop(0.2, `rgba(${electricPink * 0.5}, ${neonCyan + 15}, ${vividPurple + 20}, 0.95)`)
+        gradient.addColorStop(0.4, `rgba(${electricPink * 0.7}, ${neonCyan + 10}, ${vividPurple + 10}, 0.92)`)
+        gradient.addColorStop(0.7, `rgba(${electricPink * 0.4}, ${neonCyan}, ${vividPurple}, 0.88)`)
+        gradient.addColorStop(1, `rgba(2, ${Math.floor(neonCyan * 0.3)}, ${Math.floor(vividPurple * 0.7)}, 0.98)`)
         break
     }
 
@@ -1634,41 +1648,62 @@ export class VisualizationRenderer {
   }
 
   private drawPainterlyStroke(centerX: number, centerY: number, angle: number, length: number, width: number, hue: number, saturation: number, lightness: number, intensity: number, seed: number): void {
-    // Create realistic brush stroke with bristle texture
-    const segments = 12
+    // Create highly realistic brush stroke with artistic flair
+    const segments = 15
     const segmentLength = length / segments
+
+    // Add a subtle glow effect behind the stroke
+    this.ctx.save()
+    this.ctx.shadowColor = `hsla(${hue}, ${saturation}%, ${lightness + 20}%, 0.4)`
+    this.ctx.shadowBlur = width * 0.5
+    this.ctx.globalCompositeOperation = 'multiply'
 
     for (let seg = 0; seg < segments; seg++) {
       const progress = seg / segments
-      const currentWidth = width * (1 - progress * 0.3) * (0.8 + Math.sin(seed + seg) * 0.4)
+      const currentWidth = width * (0.6 + intensity * 0.8) * (1 - progress * 0.2) * (0.9 + Math.sin(seed + seg * 0.7) * 0.3)
 
-      // Multiple bristle marks per segment
-      const bristles = Math.floor(currentWidth / 3) + 1
+      // More sophisticated bristle simulation
+      const bristles = Math.floor(currentWidth / 2.5) + 2
 
       for (let bristle = 0; bristle < bristles; bristle++) {
         this.ctx.beginPath()
 
-        const bristleOffset = (bristle - bristles / 2) * (currentWidth / bristles)
-        const bristleAngle = angle + (bristleOffset / length) * 0.3
+        const bristleOffset = (bristle - bristles / 2) * (currentWidth / bristles) * (0.8 + Math.sin(seed + bristle) * 0.4)
+        const bristleAngle = angle + (bristleOffset / length) * 0.15 + Math.sin(seed + seg + bristle) * 0.1
 
         const startX = centerX + Math.cos(angle) * segmentLength * seg + Math.cos(angle + Math.PI/2) * bristleOffset
         const startY = centerY + Math.sin(angle) * segmentLength * seg + Math.sin(angle + Math.PI/2) * bristleOffset
-        const endX = startX + Math.cos(bristleAngle) * segmentLength * (1 + Math.sin(seed + seg + bristle) * 0.2)
-        const endY = startY + Math.sin(bristleAngle) * segmentLength * (1 + Math.cos(seed + seg + bristle) * 0.2)
+
+        // Add organic curve to brush stroke
+        const controlX = startX + Math.cos(bristleAngle) * segmentLength * 0.7 + Math.sin(seed + seg) * 8
+        const controlY = startY + Math.sin(bristleAngle) * segmentLength * 0.7 + Math.cos(seed + seg) * 8
+        const endX = startX + Math.cos(bristleAngle) * segmentLength * (1 + Math.sin(seed + seg + bristle) * 0.25)
+        const endY = startY + Math.sin(bristleAngle) * segmentLength * (1 + Math.cos(seed + seg + bristle) * 0.25)
 
         this.ctx.moveTo(startX, startY)
-        this.ctx.lineTo(endX, endY)
+        this.ctx.quadraticCurveTo(controlX, controlY, endX, endY)
 
-        const bristleHue = hue + (bristle - bristles/2) * 5
-        const bristleLightness = lightness + Math.sin(seed + seg + bristle) * 10
-        const alpha = (intensity * 0.6) * (1 - progress * 0.4) * (0.7 + Math.random() * 0.6)
+        // Rich color variations for each bristle
+        const bristleHue = hue + (bristle - bristles/2) * 8 + Math.sin(seed + seg) * 15
+        const bristleSaturation = Math.max(30, saturation + Math.cos(seed + bristle) * 20)
+        const bristleLightness = lightness + Math.sin(seed + seg + bristle) * 15 + (bristle % 2) * 10
+        const alpha = (intensity * 0.8) * (1 - progress * 0.3) * (0.6 + Math.sin(seed + bristle) * 0.4)
 
-        this.ctx.strokeStyle = `hsla(${bristleHue}, ${saturation}%, ${bristleLightness}%, ${alpha})`
-        this.ctx.lineWidth = 1 + Math.random() * 2
+        // Create gradient stroke for depth
+        const strokeGradient = this.ctx.createLinearGradient(startX, startY, endX, endY)
+        strokeGradient.addColorStop(0, `hsla(${bristleHue}, ${bristleSaturation}%, ${bristleLightness + 10}%, ${alpha})`)
+        strokeGradient.addColorStop(0.6, `hsla(${bristleHue + 5}, ${bristleSaturation - 5}%, ${bristleLightness}%, ${alpha * 0.9})`)
+        strokeGradient.addColorStop(1, `hsla(${bristleHue + 10}, ${bristleSaturation - 10}%, ${bristleLightness - 10}%, ${alpha * 0.7})`)
+
+        this.ctx.strokeStyle = strokeGradient
+        this.ctx.lineWidth = (1.5 + Math.sin(seed + bristle) * 1.5) * (intensity * 0.5 + 0.5)
         this.ctx.lineCap = 'round'
+        this.ctx.lineJoin = 'round'
         this.ctx.stroke()
       }
     }
+
+    this.ctx.restore()
   }
 
   private drawPaperTexture(audioAnalysis: { frequencyData: Uint8Array, amplitude: number, duration: number }, seed: number): void {
