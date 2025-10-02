@@ -1139,130 +1139,27 @@ export class VisualizationRenderer {
   private renderStaticNeonGrid(centerX: number, centerY: number, audioAnalysis: { frequencyData: Uint8Array, amplitude: number, duration: number }, seed: number, scale: number, sensitivity: number): void {
     this.ctx.save()
 
-    const maxRadius = Math.max(this.canvas.width, this.canvas.height) * 0.7 * scale
+    const maxRadius = Math.max(this.canvas.width, this.canvas.height) * 0.8 * scale
     const frequencyData = audioAnalysis.frequencyData
     const amplitude = audioAnalysis.amplitude
 
-    // Add mixed media texture
-    this.drawMixedMediaTexture(audioAnalysis, seed)
+    // Create deep space background with subtle gradients
+    this.drawDeepSpaceBackground(audioAnalysis, seed)
 
-    // Create abstract color field layers
-    this.drawAbstractColorFields(audioAnalysis, seed)
+    // Add holographic grid patterns
+    this.drawHolographicGrid(audioAnalysis, seed)
 
-    // Add gestural mark-making
-    this.drawGesturalMarks(audioAnalysis, seed)
+    // Create 3D geometric crystals/diamonds
+    this.drawCrystallineStructures(centerX, centerY, audioAnalysis, seed, maxRadius)
 
-    // Create expressive mark-making instead of digital streams
-    const markCount = Math.floor(25 + amplitude * 40)
+    // Add optical tunnels and depth effects
+    this.drawOpticalTunnels(centerX, centerY, audioAnalysis, seed, maxRadius)
 
-    for (let mark = 0; mark < markCount; mark++) {
-      const freqIndex = Math.floor((mark / markCount) * frequencyData.length)
-      const freqValue = frequencyData[freqIndex] || 60
-      const intensity = Math.max(0.2, (freqValue / 255) * sensitivity)
+    // Create interconnected network lines
+    this.drawNetworkConnections(audioAnalysis, seed)
 
-      if (intensity < 0.3) continue
-
-      // Start from random corners and edges, flow across entire canvas
-      const startType = Math.floor(Math.random() * 3) // 0=corner, 1=edge, 2=random
-      let currentX: number, currentY: number, endX: number, endY: number
-
-      if (startType === 0) {
-        // Start from corners
-        const corner = Math.floor(Math.random() * 4)
-        switch (corner) {
-          case 0: currentX = 0; currentY = 0; break
-          case 1: currentX = this.canvas.width; currentY = 0; break
-          case 2: currentX = this.canvas.width; currentY = this.canvas.height; break
-          default: currentX = 0; currentY = this.canvas.height; break
-        }
-        endX = Math.random() * this.canvas.width
-        endY = Math.random() * this.canvas.height
-      } else if (startType === 1) {
-        // Start from edges
-        const edge = Math.floor(Math.random() * 4)
-        switch (edge) {
-          case 0: // top
-            currentX = Math.random() * this.canvas.width
-            currentY = 0
-            endX = Math.random() * this.canvas.width
-            endY = this.canvas.height * (0.6 + Math.random() * 0.4)
-            break
-          case 1: // right
-            currentX = this.canvas.width
-            currentY = Math.random() * this.canvas.height
-            endX = this.canvas.width * (0.3 + Math.random() * 0.4)
-            endY = Math.random() * this.canvas.height
-            break
-          case 2: // bottom
-            currentX = Math.random() * this.canvas.width
-            currentY = this.canvas.height
-            endX = Math.random() * this.canvas.width
-            endY = this.canvas.height * (0.2 + Math.random() * 0.4)
-            break
-          default: // left
-            currentX = 0
-            currentY = Math.random() * this.canvas.height
-            endX = this.canvas.width * (0.6 + Math.random() * 0.4)
-            endY = Math.random() * this.canvas.height
-            break
-        }
-      } else {
-        // Random start and end points
-        currentX = Math.random() * this.canvas.width
-        currentY = Math.random() * this.canvas.height
-        endX = Math.random() * this.canvas.width
-        endY = Math.random() * this.canvas.height
-      }
-
-      // Create data stream path across canvas
-      const segments = 30
-      const streamPath: { x: number, y: number }[] = []
-
-      for (let seg = 0; seg < segments; seg++) {
-        const progress = seg / segments
-        const targetX = currentX + (endX - currentX) * progress
-        const targetY = currentY + (endY - currentY) * progress
-
-        // Digital noise that adapts to canvas size
-        const digitalNoise = Math.sin(seed + stream + seg * 0.8) * Math.max(this.canvas.width, this.canvas.height) * 0.05 * intensity
-        const noiseAngle = (stream + seg) * 0.6
-
-        const finalX = targetX + Math.cos(noiseAngle) * digitalNoise
-        const finalY = targetY + Math.sin(noiseAngle) * digitalNoise
-
-        streamPath.push({ x: finalX, y: finalY })
-      }
-
-      // Draw stream
-      this.ctx.beginPath()
-      this.ctx.moveTo(streamPath[0].x, streamPath[0].y)
-      streamPath.forEach(point => this.ctx.lineTo(point.x, point.y))
-
-      const streamHue = stream * 20 + amplitude * 120
-      const streamGradient = this.ctx.createLinearGradient(
-        streamPath[0].x, streamPath[0].y,
-        streamPath[streamPath.length - 1].x, streamPath[streamPath.length - 1].y
-      )
-      streamGradient.addColorStop(0, `hsla(${streamHue}, 90%, 80%, ${intensity * 0.9})`)
-      streamGradient.addColorStop(0.5, `hsla(${streamHue + 30}, 85%, 70%, ${intensity * 0.7})`)
-      streamGradient.addColorStop(1, `hsla(${streamHue + 60}, 80%, 60%, 0)`)
-
-      this.ctx.strokeStyle = streamGradient
-      this.ctx.lineWidth = 1.5 + intensity * 5
-      this.ctx.lineCap = 'round'
-      this.ctx.stroke()
-
-      // Add data points
-      for (let i = 0; i < streamPath.length; i += 4) {
-        const point = streamPath[i]
-        const pointSize = 1.5 + intensity * 4
-
-        this.ctx.beginPath()
-        this.ctx.arc(point.x, point.y, pointSize, 0, Math.PI * 2)
-        this.ctx.fillStyle = `hsla(${streamHue + i * 8}, 95%, 85%, ${intensity * 0.8})`
-        this.ctx.fill()
-      }
-    }
+    // Add holographic particles and light effects
+    this.drawHolographicParticles(audioAnalysis, seed)
 
     this.ctx.restore()
   }
@@ -1894,6 +1791,297 @@ export class VisualizationRenderer {
       this.ctx.lineJoin = 'round'
       this.ctx.stroke()
     }
+  }
+
+  // Modern digital art methods for NeonGrid style
+  private drawDeepSpaceBackground(audioAnalysis: { frequencyData: Uint8Array, amplitude: number, duration: number }, seed: number): void {
+    // Create deep space gradient with subtle color shifts
+    const gradient = this.ctx.createRadialGradient(
+      this.canvas.width * 0.3, this.canvas.height * 0.3, 0,
+      this.canvas.width * 0.7, this.canvas.height * 0.7, Math.max(this.canvas.width, this.canvas.height)
+    )
+
+    // Audio-reactive color shifts
+    const bassInfluence = this.calculateBandAverage(audioAnalysis.frequencyData, 0, 0.1)
+    const midInfluence = this.calculateBandAverage(audioAnalysis.frequencyData, 0.1, 0.6)
+    const trebleInfluence = this.calculateBandAverage(audioAnalysis.frequencyData, 0.6, 1.0)
+
+    const deepBlue = Math.floor(bassInfluence * 30 + 5)
+    const cosmicPurple = Math.floor(midInfluence * 40 + 10)
+    const voidBlack = Math.floor(trebleInfluence * 20 + 2)
+
+    gradient.addColorStop(0, `rgba(${voidBlack}, ${deepBlue}, ${cosmicPurple + 15}, 0.95)`)
+    gradient.addColorStop(0.4, `rgba(${voidBlack + 5}, ${deepBlue + 10}, ${cosmicPurple + 20}, 0.92)`)
+    gradient.addColorStop(0.7, `rgba(${voidBlack + 2}, ${deepBlue + 5}, ${cosmicPurple + 10}, 0.88)`)
+    gradient.addColorStop(1, `rgba(${voidBlack}, ${deepBlue * 0.5}, ${cosmicPurple * 0.7}, 0.98)`)
+
+    this.ctx.fillStyle = gradient
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height)
+  }
+
+  private drawHolographicGrid(audioAnalysis: { frequencyData: Uint8Array, amplitude: number, duration: number }, seed: number): void {
+    const gridSize = 40
+    const cellWidth = this.canvas.width / gridSize
+    const cellHeight = this.canvas.height / gridSize
+    const frequencyData = audioAnalysis.frequencyData
+
+    this.ctx.globalCompositeOperation = 'screen'
+    this.ctx.globalAlpha = 0.3
+
+    for (let x = 0; x < gridSize; x++) {
+      for (let y = 0; y < gridSize; y++) {
+        const cellX = x * cellWidth
+        const cellY = y * cellHeight
+
+        // Create perspective effect - stronger toward center
+        const centerX = gridSize / 2
+        const centerY = gridSize / 2
+        const distanceFromCenter = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2)
+        const maxDistance = Math.sqrt(centerX ** 2 + centerY ** 2)
+        const perspectiveIntensity = 1 - (distanceFromCenter / maxDistance) * 0.7
+
+        const freqIndex = Math.floor(((x + y) / (gridSize * 2)) * frequencyData.length)
+        const freqValue = frequencyData[freqIndex] || 20
+        const intensity = (freqValue / 255) * perspectiveIntensity
+
+        if (intensity > 0.2) {
+          // Create grid lines with perspective
+          const lineWidth = intensity * 2
+          const opacity = intensity * 0.8
+          const hue = 180 + (x + y) * 3 + seed * 0.1
+
+          this.ctx.strokeStyle = `hsla(${hue}, 90%, 70%, ${opacity})`
+          this.ctx.lineWidth = lineWidth
+
+          // Horizontal lines
+          this.ctx.beginPath()
+          this.ctx.moveTo(cellX, cellY)
+          this.ctx.lineTo(cellX + cellWidth, cellY)
+          this.ctx.stroke()
+
+          // Vertical lines
+          this.ctx.beginPath()
+          this.ctx.moveTo(cellX, cellY)
+          this.ctx.lineTo(cellX, cellY + cellHeight)
+          this.ctx.stroke()
+        }
+      }
+    }
+
+    this.ctx.globalAlpha = 1
+    this.ctx.globalCompositeOperation = 'source-over'
+  }
+
+  private drawCrystallineStructures(centerX: number, centerY: number, audioAnalysis: { frequencyData: Uint8Array, amplitude: number, duration: number }, seed: number, maxRadius: number): void {
+    const crystalCount = Math.floor(15 + audioAnalysis.amplitude * 25)
+    const frequencyData = audioAnalysis.frequencyData
+
+    for (let crystal = 0; crystal < crystalCount; crystal++) {
+      const freqIndex = Math.floor((crystal / crystalCount) * frequencyData.length)
+      const freqValue = frequencyData[freqIndex] || 40
+      const intensity = Math.max(0.3, (freqValue / 255))
+
+      // Position crystals across canvas with some clustering
+      const clusterX = centerX + (Math.sin(seed + crystal * 0.7) * maxRadius * 0.8)
+      const clusterY = centerY + (Math.cos(seed + crystal * 0.9) * maxRadius * 0.8)
+
+      const crystalX = clusterX + (Math.random() - 0.5) * 200
+      const crystalY = clusterY + (Math.random() - 0.5) * 200
+
+      // Ensure crystals stay within canvas
+      const finalX = Math.max(50, Math.min(this.canvas.width - 50, crystalX))
+      const finalY = Math.max(50, Math.min(this.canvas.height - 50, crystalY))
+
+      const crystalSize = 20 + intensity * 60
+      const rotation = seed + crystal * 0.5
+
+      this.drawSingleCrystal(finalX, finalY, crystalSize, rotation, intensity, freqValue, crystal)
+    }
+  }
+
+  private drawSingleCrystal(x: number, y: number, size: number, rotation: number, intensity: number, freqValue: number, index: number): void {
+    this.ctx.save()
+    this.ctx.translate(x, y)
+    this.ctx.rotate(rotation)
+
+    // Create 3D diamond/crystal shape
+    const vertices = [
+      { x: 0, y: -size },           // top
+      { x: size * 0.6, y: -size * 0.3 },  // top-right
+      { x: size * 0.6, y: size * 0.3 },   // bottom-right
+      { x: 0, y: size },            // bottom
+      { x: -size * 0.6, y: size * 0.3 },  // bottom-left
+      { x: -size * 0.6, y: -size * 0.3 }  // top-left
+    ]
+
+    // Multiple faces for 3D effect
+    const faces = [
+      [0, 1, 3, 4], // main diamond
+      [0, 1, 2],    // top-right face
+      [0, 5, 4],    // top-left face
+      [3, 2, 1],    // bottom-right face
+      [3, 4, 5]     // bottom-left face
+    ]
+
+    faces.forEach((face, faceIndex) => {
+      this.ctx.beginPath()
+      this.ctx.moveTo(vertices[face[0]].x, vertices[face[0]].y)
+      face.forEach(vertexIndex => {
+        this.ctx.lineTo(vertices[vertexIndex].x, vertices[vertexIndex].y)
+      })
+      this.ctx.closePath()
+
+      // Different brightness for each face (3D lighting effect)
+      const faceBrightness = 0.3 + faceIndex * 0.15
+      const hue = 240 + (freqValue / 255) * 120 + index * 8
+      const saturation = 80 + intensity * 20
+      const lightness = 40 + faceBrightness * 40 + intensity * 30
+      const alpha = intensity * (0.6 + faceIndex * 0.1)
+
+      // Gradient fill for depth
+      const faceGradient = this.ctx.createRadialGradient(0, 0, 0, 0, 0, size)
+      faceGradient.addColorStop(0, `hsla(${hue}, ${saturation}%, ${lightness + 20}%, ${alpha})`)
+      faceGradient.addColorStop(0.7, `hsla(${hue + 20}, ${saturation - 10}%, ${lightness}%, ${alpha * 0.8})`)
+      faceGradient.addColorStop(1, `hsla(${hue + 40}, ${saturation - 20}%, ${lightness - 15}%, ${alpha * 0.4})`)
+
+      this.ctx.fillStyle = faceGradient
+      this.ctx.fill()
+
+      // Bright edges for crystal effect
+      this.ctx.strokeStyle = `hsla(${hue}, 100%, 80%, ${alpha * 0.8})`
+      this.ctx.lineWidth = 1 + intensity * 2
+      this.ctx.stroke()
+    })
+
+    // Add inner glow
+    this.ctx.beginPath()
+    this.ctx.arc(0, 0, size * 0.3, 0, Math.PI * 2)
+    const glowHue = 200 + (freqValue / 255) * 160
+    this.ctx.fillStyle = `hsla(${glowHue}, 100%, 90%, ${intensity * 0.4})`
+    this.ctx.fill()
+
+    this.ctx.restore()
+  }
+
+  private drawOpticalTunnels(centerX: number, centerY: number, audioAnalysis: { frequencyData: Uint8Array, amplitude: number, duration: number }, seed: number, maxRadius: number): void {
+    const tunnelCount = 3 + Math.floor(audioAnalysis.amplitude * 4)
+
+    for (let tunnel = 0; tunnel < tunnelCount; tunnel++) {
+      const freqIndex = Math.floor((tunnel / tunnelCount) * audioAnalysis.frequencyData.length)
+      const freqValue = audioAnalysis.frequencyData[freqIndex] || 30
+      const intensity = (freqValue / 255)
+
+      if (intensity < 0.4) continue
+
+      // Tunnel position with some offset from center
+      const tunnelX = centerX + Math.sin(seed + tunnel * 2) * maxRadius * 0.3
+      const tunnelY = centerY + Math.cos(seed + tunnel * 2.3) * maxRadius * 0.3
+
+      const rings = 20
+      const maxTunnelRadius = maxRadius * (0.3 + intensity * 0.4)
+
+      this.ctx.globalCompositeOperation = 'screen'
+
+      for (let ring = 0; ring < rings; ring++) {
+        const ringProgress = ring / rings
+        const ringRadius = maxTunnelRadius * (1 - ringProgress) * (0.1 + ringProgress * 0.9)
+        const ringOpacity = intensity * (1 - ringProgress) * 0.6
+
+        if (ringOpacity < 0.05) continue
+
+        const hue = 160 + tunnel * 40 + ring * 8 + (freqValue / 255) * 80
+        this.ctx.strokeStyle = `hsla(${hue}, 90%, 70%, ${ringOpacity})`
+        this.ctx.lineWidth = 2 + intensity * 4 * (1 - ringProgress)
+
+        this.ctx.beginPath()
+        this.ctx.arc(tunnelX, tunnelY, ringRadius, 0, Math.PI * 2)
+        this.ctx.stroke()
+      }
+
+      this.ctx.globalCompositeOperation = 'source-over'
+    }
+  }
+
+  private drawNetworkConnections(audioAnalysis: { frequencyData: Uint8Array, amplitude: number, duration: number }, seed: number): void {
+    const nodeCount = Math.floor(20 + audioAnalysis.amplitude * 30)
+    const nodes: { x: number, y: number, intensity: number }[] = []
+
+    // Create nodes
+    for (let i = 0; i < nodeCount; i++) {
+      const freqIndex = Math.floor((i / nodeCount) * audioAnalysis.frequencyData.length)
+      const freqValue = audioAnalysis.frequencyData[freqIndex] || 20
+      const intensity = (freqValue / 255)
+
+      nodes.push({
+        x: Math.random() * this.canvas.width,
+        y: Math.random() * this.canvas.height,
+        intensity
+      })
+    }
+
+    // Connect nearby nodes
+    this.ctx.globalAlpha = 0.6
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const distance = Math.sqrt(
+          (nodes[i].x - nodes[j].x) ** 2 + (nodes[i].y - nodes[j].y) ** 2
+        )
+
+        const maxConnectionDistance = 200 + audioAnalysis.amplitude * 100
+        if (distance < maxConnectionDistance) {
+          const connectionIntensity = (nodes[i].intensity + nodes[j].intensity) / 2
+          const connectionOpacity = connectionIntensity * (1 - distance / maxConnectionDistance) * 0.8
+
+          if (connectionOpacity > 0.1) {
+            const hue = 200 + (i + j) * 5 + seed * 0.1
+            this.ctx.strokeStyle = `hsla(${hue}, 80%, 60%, ${connectionOpacity})`
+            this.ctx.lineWidth = 1 + connectionIntensity * 3
+
+            this.ctx.beginPath()
+            this.ctx.moveTo(nodes[i].x, nodes[i].y)
+            this.ctx.lineTo(nodes[j].x, nodes[j].y)
+            this.ctx.stroke()
+          }
+        }
+      }
+    }
+    this.ctx.globalAlpha = 1
+  }
+
+  private drawHolographicParticles(audioAnalysis: { frequencyData: Uint8Array, amplitude: number, duration: number }, seed: number): void {
+    const particleCount = Math.floor(50 + audioAnalysis.amplitude * 100)
+
+    this.ctx.globalCompositeOperation = 'screen'
+
+    for (let particle = 0; particle < particleCount; particle++) {
+      const freqIndex = Math.floor((particle / particleCount) * audioAnalysis.frequencyData.length)
+      const freqValue = audioAnalysis.frequencyData[freqIndex] || 10
+      const intensity = (freqValue / 255)
+
+      if (intensity < 0.2) continue
+
+      const particleX = Math.random() * this.canvas.width
+      const particleY = Math.random() * this.canvas.height
+      const particleSize = 1 + intensity * 8
+      const opacity = intensity * 0.8
+
+      const hue = 180 + particle * 2 + (freqValue / 255) * 180
+
+      const particleGradient = this.ctx.createRadialGradient(
+        particleX, particleY, 0,
+        particleX, particleY, particleSize * 2
+      )
+      particleGradient.addColorStop(0, `hsla(${hue}, 100%, 90%, ${opacity})`)
+      particleGradient.addColorStop(0.5, `hsla(${hue + 30}, 90%, 70%, ${opacity * 0.6})`)
+      particleGradient.addColorStop(1, `hsla(${hue + 60}, 80%, 50%, 0)`)
+
+      this.ctx.fillStyle = particleGradient
+      this.ctx.beginPath()
+      this.ctx.arc(particleX, particleY, particleSize, 0, Math.PI * 2)
+      this.ctx.fill()
+    }
+
+    this.ctx.globalCompositeOperation = 'source-over'
   }
 
 
